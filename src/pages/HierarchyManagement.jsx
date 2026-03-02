@@ -146,7 +146,9 @@ export default function HierarchyManagement() {
                 getAreas()
             ])
 
-            if (empRes.data) setEmployees(empRes.data)
+            if (empRes.data) {
+                setEmployees(empRes.data)
+            }
             if (sedesRes.data) setSedes(sedesRes.data)
             if (buRes.data) setBusinessUnits(buRes.data)
             if (areasRes.data) setAreas(areasRes.data)
@@ -453,10 +455,17 @@ export default function HierarchyManagement() {
                                                         <MapPin size={10} /> {emp.sede}
                                                     </span>
                                                 </div>
-                                                {emp.supervisor && (
+                                                {emp.supervisor_id ? (
                                                     <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
                                                         <ChevronRight size={10} />
-                                                        Jefe actual: <span className="font-medium text-gray-600">{emp.supervisor.full_name}</span>
+                                                        Jefe actual: <span className="font-medium text-gray-600">
+                                                            {emp.supervisor?.full_name || 'Cargando...'}
+                                                        </span>
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                                                        <AlertCircle size={10} />
+                                                        Sin jefe asignado
                                                     </p>
                                                 )}
                                             </div>

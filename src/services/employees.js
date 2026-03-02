@@ -84,38 +84,12 @@ export const assignSupervisorBulk = async (supervisorId, employeeIds) => {
  */
 export const getEmployeesWithSupervisor = async () => {
   try {
-    // Necesitamos obtener el área del empleado. El área está vinculada al cargo (job_positions).
-    // Hacemos join con employees -> job_positions (por nombre) -> areas
-    // Ojo: position en employees es texto plano desnormalizado, lo que complica el join directo si no es FK.
-    // Asumiremos que tenemos que hacer un cruce manual o que la RPC lo maneje.
-    // Para simplificar y ser robustos, traemos todo y cruzamos con getPositions si es necesario, 
-    // pero mejor aún, intentemos traer el área si existe relación.
-    
-    // Si 'position' es solo texto, no podemos hacer join directo a job_positions fácil en una sola query sin FK.
-    // Solución: Traeremos los empleados y luego enriquecemos con el área en el cliente usando el catálogo de cargos.
-    
-    const { data, error } = await supabase
-      .from('employees')
-      .select(`
-        id, 
-        full_name, 
-        dni, 
-        position, 
-        sede, 
-        business_unit, 
-        profile_picture_url,
-        supervisor_id,
-        supervisor:employees!supervisor_id (
-          id, full_name, position, sede
-        )
-      `)
-      .eq('is_active', true)
-      .order('full_name')
+    // Usar RPC segura para obtener nombres de jefes incluso si RLS los oculta
+    const { data, error } = await supabase.rpc('get_employees_hierarchy_data')
 
     if (error) throw error
 
     // Enriquecimiento manual de Áreas (Position -> Area)
-    // Esto es necesario porque 'position' en employees no es FK
     const { data: positions } = await supabase
       .from('job_positions')
       .select('name, areas(name)')
@@ -131,7 +105,14 @@ export const getEmployeesWithSupervisor = async () => {
 
     const enrichedData = data.map(emp => ({
       ...emp,
-      area_name: positionAreaMap[emp.position] || 'Sin Área'
+      position: emp.emp_position, // Mapear de vuelta para compatibilidad
+      area_name: positionAreaMap[emp.emp_position] || 'Sin Área',
+      // Mapear estructura plana de RPC a objeto supervisor anidado para compatibilidad
+      supervisor: emp.supervisor_id ? {
+        id: emp.supervisor_id,
+        full_name: emp.supervisor_name || 'Usuario Inactivo/Borrado',
+        position: emp.sup_position
+      } : null
     }))
 
     return { data: enrichedData, error: null }
