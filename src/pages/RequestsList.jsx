@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getRequests } from '../services/requests'
+import { getRequests, getSigningAuthority } from '../services/requests'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import Modal from '../components/ui/Modal'
@@ -115,7 +115,17 @@ export default function RequestsList() {
 
   // --- GENERAR Y SUBIR PDF A SUPABASE ---
   const generateAndUploadPDF = async (request) => {
-    const renderData = buildRenderData({ request, employer: EMPLOYER, user })
+    // 1. Obtener Autoridad Firmante (Jefe Inmediato)
+    const empId = request.employee_id || request.employees?.id
+    const { data: signer } = await getSigningAuthority(empId)
+    
+    // Crear objeto 'user' simulado con los datos del firmante para el generador
+    const signerUser = signer ? {
+        full_name: signer.full_name,
+        dni: signer.dni
+    } : null
+
+    const renderData = buildRenderData({ request, employer: EMPLOYER, user: signerUser })
     const filename = `Papeleta_${request.employees?.dni || 'empleado'}_${request.id}`
 
     const pdfBlob = await generatePapeletaPDF(renderData, filename, 'blob')

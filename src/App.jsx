@@ -21,6 +21,7 @@ import PapeletaVacaciones from './components/PapeletaVacaciones'
 import DashboardLayout from './layouts/DashboardLayout'
 import EmployeeLifecycle from './pages/EmployeeLifecycle'
 import OrganizationStructure from './pages/OrganizationStructure'
+import HierarchyManagement from './pages/HierarchyManagement'
 
 // Layout Wrapper para rutas privadas
 const PrivateLayout = () => {
@@ -147,6 +148,13 @@ function App() {
               <Route path="/organization-structure" element={
                 <ProtectedRoute module="settings" requiredAction="write">
                   <OrganizationStructure />
+                </ProtectedRoute>
+              } />
+
+              {/* Gestión de Jerarquías (Supervisores Directos) */}
+              <Route path="/hierarchy-management" element={
+                <ProtectedRoute module="settings" requiredAction="write">
+                  <HierarchyManagement />
                 </ProtectedRoute>
               } />
 

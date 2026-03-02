@@ -104,8 +104,10 @@ const PapeletaFinal = () => {
         const { data, error } = await getPapeletaById(id)
         if (error) throw new Error(error.message)
         setPapeleta(data)
+        
         if (data?.employee_id) {
           const { data: signerData } = await getSigningAuthority(data.employee_id)
+          console.log('SIGNER DATA FETCHED:', signerData)
           if (signerData) setSigner(signerData)
         }
       } catch (err) {
@@ -113,9 +115,6 @@ const PapeletaFinal = () => {
       } finally {
         setLoading(false)
       }
-      // Dentro del useEffect, después de: if (signerData) setSigner(signerData)
-      console.log('SIGNER DATA:', signerData)
-      console.log('EMPLOYEE ID:', data?.employee_id)
     }
     fetchData()
   }, [id])
