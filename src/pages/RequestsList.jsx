@@ -185,7 +185,7 @@ export default function RequestsList() {
         .from('vacation_requests')
         .update({
           status: newStatus,
-          validated_by: user?.id,
+          validated_by: user?.employee_id || null,
           validated_at: new Date().toISOString(),
           pdf_url: pdfUrl,
         })
