@@ -37,6 +37,8 @@ export default function RequestsList() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('ALL')
+  const [filterMonth, setFilterMonth] = useState('')
+  const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()))
   const [processingId, setProcessingId] = useState(null)
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
@@ -251,6 +253,24 @@ export default function RequestsList() {
   }
 
   // --- FILTRADO ---
+  const currentYear = new Date().getFullYear()
+  const yearOptions = Array.from({ length: 4 }, (_, i) => currentYear - 2 + i)
+
+  const MONTHS = [
+    { value: '1', label: 'Enero' },
+    { value: '2', label: 'Febrero' },
+    { value: '3', label: 'Marzo' },
+    { value: '4', label: 'Abril' },
+    { value: '5', label: 'Mayo' },
+    { value: '6', label: 'Junio' },
+    { value: '7', label: 'Julio' },
+    { value: '8', label: 'Agosto' },
+    { value: '9', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' },
+    { value: '12', label: 'Diciembre' },
+  ]
+
   const filteredRequests = requests.filter((req) => {
     const employeeName = req.employees?.full_name || 'Desconocido'
     const employeeDni = req.employees?.dni || ''
@@ -258,7 +278,12 @@ export default function RequestsList() {
       employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employeeDni.includes(searchTerm)
     const matchesStatus = filterStatus === 'ALL' || req.status === filterStatus
-    return matchesSearch && matchesStatus
+
+    const startDate = req.start_date ? new Date(req.start_date + 'T00:00:00') : null
+    const matchesYear = !filterYear || (startDate && startDate.getFullYear() === Number(filterYear))
+    const matchesMonth = !filterMonth || (startDate && startDate.getMonth() + 1 === Number(filterMonth))
+
+    return matchesSearch && matchesStatus && matchesYear && matchesMonth
   })
 
   return (
@@ -285,7 +310,7 @@ export default function RequestsList() {
 
       {/* Filtros */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-        <div className="md:col-span-8 lg:col-span-9 relative">
+        <div className="md:col-span-12 lg:col-span-6 relative">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             size={20}
@@ -298,11 +323,11 @@ export default function RequestsList() {
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
         </div>
-        <div className="md:col-span-4 lg:col-span-3">
+        <div className="md:col-span-4 lg:col-span-2">
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all"
+            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all"
           >
             <option value="ALL">Todos los estados</option>
             <option value="PENDIENTE">Pendientes</option>
@@ -310,6 +335,30 @@ export default function RequestsList() {
             <option value="COMPLETADO">Completados</option>
             <option value="RECHAZADO">Rechazados</option>
             <option value="CANCELADO">Cancelados</option>
+          </select>
+        </div>
+        <div className="md:col-span-4 lg:col-span-2">
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all"
+          >
+            <option value="">Todos los meses</option>
+            {MONTHS.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-4 lg:col-span-2">
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all"
+          >
+            <option value="">Todos los años</option>
+            {yearOptions.map((y) => (
+              <option key={y} value={String(y)}>{y}</option>
+            ))}
           </select>
         </div>
       </div>
