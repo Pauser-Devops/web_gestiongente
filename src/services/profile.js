@@ -27,10 +27,11 @@ export const uploadProfilePicture = async (userId, file) => {
 
 export const updateUserProfilePicture = async (employeeId, url) => {
     try {
-        const { error } = await supabase
-            .from('employees')
-            .update({ profile_picture_url: url })
-            .eq('id', employeeId)
+        // Usa el RPC con SECURITY DEFINER para bypassear RLS (mismo enfoque que la app móvil)
+        const { error } = await supabase.rpc('update_employee_profile_picture', {
+            p_employee_id: employeeId,
+            p_image_url: url
+        })
 
         if (error) throw error
         return { error: null }
