@@ -400,14 +400,19 @@ Deno.serve(async (req: Request) => {
     // 6. URL Pública
     const { data: urlData } = supabase.storage.from('papeletas').getPublicUrl(storagePath)
 
+    // Reemplazar hostname interno de Docker (kong) con la IP pública del servidor
+    const publicUrl = urlData.publicUrl
+      .replace('http://kong:8000', 'http://161.132.48.71:8000')
+      .replace('https://kong:8000', 'http://161.132.48.71:8000')
+
     // 7. Update registro
     await supabase
       .from('vacation_requests')
-      .update({ pdf_url: urlData.publicUrl })
+      .update({ pdf_url: publicUrl })
       .eq('id', record.id)
 
     return new Response(
-      JSON.stringify({ success: true, pdf_url: urlData.publicUrl }),
+      JSON.stringify({ success: true, pdf_url: publicUrl }),
       { status: 200, headers }
     )
 
