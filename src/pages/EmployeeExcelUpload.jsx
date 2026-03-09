@@ -274,7 +274,10 @@ export default function EmployeeExcelUpload({ onClose, onSuccess, defaultSede, d
                                 {uploadResult.success ? 'Importación Completada' : 'Error en la Importación'}
                             </h3>
                             <p className="text-gray-600 mt-1">
-                                Se procesaron correctamente <strong>{uploadResult.count}</strong> registros.
+                                {uploadResult.success
+                                    ? <>Se procesaron correctamente <strong>{uploadResult.count}</strong> registros.</>
+                                    : uploadResult.message
+                                }
                             </p>
                             
                             {uploadResult.errors && uploadResult.errors.length > 0 && (

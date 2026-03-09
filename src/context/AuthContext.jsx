@@ -108,7 +108,7 @@ export const AuthProvider = ({ children }) => {
            const { data: simpleEmployee, error: simpleError } = await supabase
              .from('employees')
              .select('*, role_id') // Solo traemos role_id primero
-             .eq('email', authUser.email)
+             .ilike('email', authUser.email)
              .maybeSingle();
              
            if (simpleEmployee) {
