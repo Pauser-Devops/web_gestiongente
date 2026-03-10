@@ -320,7 +320,9 @@ export default function RegisterEmployee() {
         ...formData,
         full_name: formData.full_name?.toUpperCase(),
         address: formData.address?.toUpperCase(),
-        role_id: null // Forzamos null en role_id para evitar conflictos de Foreign Key con la tabla 'roles'
+        role_id: null,       // FK con tabla 'roles' — no usada aquí
+        location_id: null,   // locations usa BIGINT; sedes usa UUID — incompatibles, no enviar
+        department_id: null  // departments usa BIGINT; business_units usa UUID — incompatibles, no enviar
       }
       
       // Ya no eliminamos employee_type porque SÍ es columna de employees
