@@ -379,7 +379,7 @@ export default function RegisterEmployee() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-6 md:p-8">
+        <form onSubmit={handleSubmit} className="p-6 md:p-8" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             {/* Sede */}
