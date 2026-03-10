@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { uploadProfilePicture, updateUserProfilePicture } from '../services/profile'
+import { toSecureUrl } from '../lib/supabase'
 import { 
   Menu, 
   Bell, 
@@ -112,7 +113,7 @@ export default function Navbar({ setSidebarOpen, isCollapsed }) {
               <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
                 {user?.profile?.profile_picture_url ? (
                   <img 
-                    src={user.profile.profile_picture_url} 
+                    src={toSecureUrl(user.profile.profile_picture_url)}
                     alt="Perfil" 
                     className="w-full h-full object-cover"
                   />

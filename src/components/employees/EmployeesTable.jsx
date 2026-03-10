@@ -1,7 +1,8 @@
-import { 
+import {
   Users, Briefcase, Mail, Phone, CreditCard,
   MapPin, Store, Calendar, Eye, Edit2, UserMinus, Trash2
 } from 'lucide-react'
+import { toSecureUrl } from '../../lib/supabase'
 
 export default function EmployeesTable({
   loading,
@@ -81,7 +82,7 @@ export default function EmployeesTable({
                     <div className="flex items-center gap-3">
                       <div className="relative flex-shrink-0">
                         {emp.profile_picture_url
-                          ? <img src={emp.profile_picture_url} alt={emp.full_name} className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-sm" />
+                          ? <img src={toSecureUrl(emp.profile_picture_url)} alt={emp.full_name} className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-sm" />
                           : <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarColor(emp.full_name)} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>{emp.full_name.charAt(0)}</div>
                         }
                         <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${emp.is_active ? 'bg-emerald-500' : 'bg-gray-300'}`} />

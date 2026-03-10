@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toSecureUrl } from '../lib/supabase'
 import { 
   Shield, 
   Users, 
@@ -283,7 +284,7 @@ export default function RolesManagement() {
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
                                             {user.profile_picture_url ? (
-                                                <img src={user.profile_picture_url} className="w-full h-full rounded-full object-cover" />
+                                                <img src={toSecureUrl(user.profile_picture_url)} className="w-full h-full rounded-full object-cover" />
                                             ) : (
                                                 user.full_name.substring(0, 2).toUpperCase()
                                             )}

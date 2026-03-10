@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, Briefcase, Calendar, Building2, Store, CreditCard, History, ArrowUpRight } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, toSecureUrl } from '../lib/supabase';
 
 export default function EmployeeProfileCard({ employee }) {
   if (!employee) return null;
@@ -60,7 +60,7 @@ export default function EmployeeProfileCard({ employee }) {
         <div className="absolute -top-16 left-6">
           {employee.profile_picture_url ? (
             <img 
-              src={employee.profile_picture_url} 
+              src={toSecureUrl(employee.profile_picture_url)}
               alt={employee.full_name}
               className="w-32 h-32 rounded-full border-4 border-white shadow-md object-cover bg-white"
             />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, toSecureUrl } from '../lib/supabase'
 import { getRecentActivity, subscribeToActivity } from '../services/activity'
 import { getDashboardStats } from '../services/dashboard'
 import MonthlyReportModal from '../components/MonthlyReportModal'
@@ -361,7 +361,7 @@ export default function Dashboard() {
                     <div className="relative">
                        {act.employees?.profile_picture_url ? (
                          <img 
-                           src={act.employees.profile_picture_url} 
+                           src={toSecureUrl(act.employees.profile_picture_url)}
                            alt={act.employees.full_name} 
                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
                          />

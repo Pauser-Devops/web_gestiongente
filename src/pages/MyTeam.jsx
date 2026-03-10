@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, toSecureUrl } from '../lib/supabase'
 import { getPositions } from '../services/positions'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -193,7 +193,7 @@ export default function MyTeam() {
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       {emp.profile_picture_url ? (
-                        <img src={emp.profile_picture_url} alt={emp.full_name} className="w-12 h-12 rounded-full object-cover" />
+                        <img src={toSecureUrl(emp.profile_picture_url)} alt={emp.full_name} className="w-12 h-12 rounded-full object-cover" />
                       ) : (
                         <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getAvatarColor(emp.full_name)} flex items-center justify-center text-white font-bold text-lg`}>
                           {emp.full_name.charAt(0)}

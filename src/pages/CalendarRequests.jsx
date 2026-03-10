@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { getRequests } from '../services/requests'
+import { toSecureUrl } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { ChevronLeft, ChevronRight, Filter, Users, Calendar, Clock, Info, Download } from 'lucide-react'
 import Modal from '../components/ui/Modal'
@@ -432,7 +433,7 @@ const CalendarRequests = () => {
                         <div className="flex items-start gap-3">
                             <div className="mt-1">
                                 {req.employees?.profile_picture_url ? (
-                                    <img src={req.employees.profile_picture_url} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                    <img src={toSecureUrl(req.employees.profile_picture_url)} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
                                 ) : (
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold bg-white/50`}>
                                         {req.employees?.full_name?.charAt(0)}
