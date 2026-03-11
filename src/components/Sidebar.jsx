@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getOrganizationStructure } from '../services/organization'
 import {
-  UserPlus,
   Users,
   Home,
   Settings,
@@ -15,7 +14,6 @@ import {
   ChevronRight,
   MapPin,
   Store,
-  Building2,
   Calendar,
   Shield,
   Plane,
@@ -125,8 +123,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                           (user?.position?.includes('ANALISTA DE GENTE') && user?.position?.includes('PART TIME') && 
                            user?.sede === 'ADM. CENTRAL' && 
                            (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'))
-    const isAnalyst = user?.role?.includes('ANALISTA') || user?.position?.includes('ANALISTA')
-    
     // Nueva lógica: Determinar si es un JEFE que NO es JEFE DE GENTE DE GESTIÓN
     const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
     const userRole = normalize(user?.role);
@@ -394,38 +390,13 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     const userRole = normalize(user?.role);
     const userPosition = normalize(user?.position);
 
-    const isAdmin = user?.role === 'ADMIN' || 
-                    user?.role === 'SUPER ADMIN' || 
-                    user?.role === 'JEFE_RRHH' || 
-                    (user?.permissions && user?.permissions['*']) ||
-                    // Excepción Part Time ADM CENTRAL
-                    (userPosition.includes('ANALISTA DE GENTE') && userPosition.includes('PART TIME') && 
-                     user?.sede === 'ADM. CENTRAL' && 
-                     (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'))
+    // isAdmin: solo usuarios con permisos globales ('*'), i.e. admin@pauser.com
+    const isAdmin = !!(user?.permissions?.['*'])
 
     return menuItems.reduce((acc, item) => {
-      // 1. Verificar si es Admin o tiene permiso explícito
-      let hasModuleAccess = isAdmin || !item.module || 
-                             (user?.permissions && user?.permissions[item.module]?.read)
-
-      // 2. CORRECCIÓN ESPECÍFICA PARA VACACIONES Y EMPLEADOS (Analistas, Jefes y Supervisores deben ver)
-      // Si el módulo es 'vacations' o 'employees' y no tiene permiso explícito pero es Analista/Jefe/Supervisor, dar acceso
-      // ACTUALIZACIÓN: Se agregan 'dashboard', 'attendance', 'calendar', 'lifecycle', 'requests' para Analistas
-      const allowedModulesForAnalyst = ['vacations', 'employees', 'dashboard', 'attendance', 'calendar', 'lifecycle', 'requests'];
-      
-      if (allowedModulesForAnalyst.includes(item.module) && !hasModuleAccess) {
-          // Usamos las variables normalizadas (userRole, userPosition) definidas arriba para evitar problemas de mayúsculas/tildes
-          const isAnalystOrBoss = userRole?.includes('ANALISTA') || 
-                                  userRole?.includes('JEFE') || 
-                                  userRole?.includes('SUPERVISOR') ||
-                                  userPosition?.includes('ANALISTA') ||
-                                  userPosition?.includes('JEFE') ||
-                                  userPosition?.includes('GERENTE') ||
-                                  userPosition?.includes('COORDINADOR') ||
-                                  userPosition?.includes('SUPERVISOR');
-                                  
-          if (isAnalystOrBoss) hasModuleAccess = true;
-      }
+      // Verificar acceso al módulo por RBAC o permiso global
+      const hasModuleAccess = isAdmin || !item.module ||
+                               !!(user?.permissions?.[item.module]?.read)
 
       if (!hasModuleAccess) return acc
 
@@ -625,7 +596,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
 }
 
 // Componente MenuItem extraído para evitar re-renderizados innecesarios
-const MenuItem = ({ item, level = 0, parentId = null, expandedMenus, toggleMenu, handleNavigation, isCollapsed, location, isMobile, activeItemId }) => {
+const MenuItem = ({ item, level = 0, expandedMenus, toggleMenu, handleNavigation, isCollapsed, location, isMobile, activeItemId }) => {
   const hasSubmenu = item.submenu && item.submenu.length > 0
   const levelKey = `level${level}`
   const isExpanded = expandedMenus[levelKey] === item.id
@@ -754,11 +725,10 @@ const MenuItem = ({ item, level = 0, parentId = null, expandedMenus, toggleMenu,
           ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}
         `}>
           {item.submenu.map((subItem) => (
-            <MenuItem 
-              key={subItem.id} 
-              item={subItem} 
+            <MenuItem
+              key={subItem.id}
+              item={subItem}
               level={level + 1}
-              parentId={item.id}
               expandedMenus={expandedMenus}
               toggleMenu={toggleMenu}
               handleNavigation={handleNavigation}

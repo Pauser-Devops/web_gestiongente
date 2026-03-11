@@ -23,6 +23,23 @@ import EmployeeLifecycle from './pages/EmployeeLifecycle'
 import OrganizationStructure from './pages/OrganizationStructure'
 import HierarchyManagement from './pages/HierarchyManagement'
 
+// Página 404
+const NotFound = () => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-8 text-center">
+    <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full">
+      <div className="text-7xl font-bold text-blue-600 mb-2">404</div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-2">Página no encontrada</h1>
+      <p className="text-gray-500 mb-6">La ruta que buscas no existe o fue movida.</p>
+      <button
+        onClick={() => window.history.back()}
+        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+      >
+        Volver Atrás
+      </button>
+    </div>
+  </div>
+)
+
 // Layout Wrapper para rutas privadas
 const PrivateLayout = () => {
   const { session, loading } = useAuth()
@@ -49,8 +66,8 @@ const PrivateLayout = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
+    <ToastProvider>
+      <AuthProvider>
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -193,12 +210,12 @@ function App() {
               } />
             </Route>
 
-            {/* Redirigir cualquier otra ruta a home */}
-            <Route path="*" element={<Navigate to="/" />} />
+            {/* Ruta 404 */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Router>
-      </ToastProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </ToastProvider>
   )
 }
 

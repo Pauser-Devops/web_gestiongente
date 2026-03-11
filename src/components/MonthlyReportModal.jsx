@@ -5,7 +5,7 @@ import { getPositions } from '../services/positions' // Importar servicio de car
 import { supabase } from '../lib/supabase' // Importar supabase
 import { useAuth } from '../context/AuthContext'
 import { Download, Users, Clock, AlertTriangle, Briefcase, Calendar, UserMinus } from 'lucide-react' // Importar UserMinus
-import * as XLSX from 'xlsx'
+import * as XLSX from '@e965/xlsx'
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
     PieChart, Pie, Cell, AreaChart, Area, LineChart, Line

@@ -10,16 +10,7 @@ export const getSigningAuthority = async (employeeId) => {
     return { data, error: null }
   } catch (error) {
     console.error('Error fetching signing authority:', error)
-    // Retornar fallback en caso de error de RPC
-    return { 
-      data: {
-        full_name: "GIANCARLO URBINA GAITAN",
-        dni: "18161904",
-        position: "REPRESENTANTE LEGAL",
-        rule: "FALLBACK_ERROR"
-      }, 
-      error 
-    }
+    return { data: null, error }
   }
 }
 
@@ -72,8 +63,6 @@ export const updateRequestStatus = async (id, status, userId) => {
 
 export const getRequests = async () => {
   try {
-    console.log('Fetching requests...')
-    
     // 1. Intentar traer todo con Join explícito
     const { data, error } = await supabase
       .from('vacation_requests')
@@ -102,7 +91,6 @@ export const getRequests = async () => {
       throw error
     }
 
-    console.log('Requests fetched:', data?.length)
     return { data, error: null }
   } catch (error) {
     console.error('Error fetching requests:', error)

@@ -3,14 +3,10 @@ import { supabase } from '../lib/supabase'
 // --- GESTIÓN DE ROLES ---
 
 export const getRoles = async () => {
-  console.log('Fetching roles...')
   const { data, error } = await supabase
     .from('roles')
     .select('*')
     .order('name')
-  
-  if (error) console.error('Error fetching roles:', error)
-  else console.log('Roles fetched:', data)
 
   return { data, error }
 }

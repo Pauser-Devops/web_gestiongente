@@ -13,7 +13,7 @@ import {
   FileText,
   Eye
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import * as XLSX from '@e965/xlsx'
 
 export default function EmployeeLifecycle() {
   const { user } = useAuth()

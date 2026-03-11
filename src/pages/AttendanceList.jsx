@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { Calendar, Clock, Filter, Search, CheckCircle, XCircle, AlertCircle, MapPin, X, ChevronLeft, ChevronRight, Download, Upload, FileSpreadsheet } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import * as XLSX from '@e965/xlsx'
 import Modal from '../components/ui/Modal'
 import { bulkImportAttendance } from '../services/attendance'
 
@@ -11,6 +12,7 @@ const ATTENDANCE_FILTERS_KEY = 'attendance_list_filters'
 
 export default function AttendanceList() {
     const { user } = useAuth()
+    const { showToast } = useToast()
     const [attendances, setAttendances] = useState([])
     const [loading, setLoading] = useState(true)
     const [exporting, setExporting] = useState(false)
@@ -232,16 +234,13 @@ export default function AttendanceList() {
             const userPosition = normalize(user?.position);
 
             const isGlobalAdmin = (
-                userRole === 'ADMIN' || 
-                userRole === 'SUPER ADMIN' || 
-                userRole === 'JEFE_RRHH' || 
+                userRole === 'ADMIN' ||
+                userRole === 'SUPER ADMIN' ||
+                userRole === 'JEFE_RRHH' ||
                 userPosition.includes('JEFE DE GENTE') ||
                 userPosition.includes('GERENTE GENERAL') ||
-                (user?.permissions && user?.permissions['*']) ||
-                // Excepción Part Time ADM CENTRAL
-                (userPosition.includes('ANALISTA DE GENTE') && userPosition.includes('PART TIME') && 
-                 user?.sede === 'ADM. CENTRAL' && 
-                 (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'))
+                userPosition.includes('ANALISTA DE GENTE') || // Analistas de Gente y Gestión tienen acceso global
+                (user?.permissions && user?.permissions['*'])
             );
             
             const isBoss = userRole.includes('JEFE') || 
@@ -700,7 +699,7 @@ export default function AttendanceList() {
 
         } catch (error) {
             console.error('Error cargando asistencias:', error)
-            alert('Error cargando asistencias: ' + error.message)
+            showToast('Error cargando asistencias: ' + error.message, 'error')
         } finally {
             setLoading(false)
         }
@@ -731,48 +730,15 @@ export default function AttendanceList() {
             if (endDate.includes('T')) endDate = endDate.split('T')[0];
 
             // 1. Determinar el modo de operación (Roster vs Histórico)
-            
-            // Si el usuario no ha tocado las fechas (o sea, si coinciden y no se especificó un rango histórico distinto),
-            // aseguramos que sea la fecha de HOY real al momento del clic.
-            // Esto cubre el caso donde la app lleva abierta horas y cruzó la medianoche.
-            const todayReal = getPeruDate();
-            if (startDate === endDate && startDate !== todayReal) {
-                // Si la fecha seleccionada es "ayer" (o pasado) pero es un rango de un solo día,
-                // y asumimos que es el comportamiento por defecto, podríamos actualizarla.
-                // PERO: El usuario podría querer ver el reporte de ayer explícitamente.
-                // SOLUCIÓN: Si la fecha en el estado es igual a la fecha "inicial" que se calculó hace horas (y ya no es hoy),
-                // asumimos que es un filtro "stale" y usamos hoy.
-                // Como no tenemos la fecha "inicial" guardada, usamos la heurística:
-                // Si el usuario no ha interactuado explícitamente (difícil saber), 
-                // PERO el usuario dijo "con el filtro de fecha por defecto tomando siempre en cuenta la fecha del ordenador".
-                // Entonces, si las fechas son iguales, asumimos que quiere "HOY".
-                // (Riesgo: Si quiere ver ayer, tendrá que seleccionar ayer explícitamente de nuevo o seleccionar rango).
-                // Para ser menos invasivos, solo lo hacemos si la diferencia es de 1 día (ayer vs hoy).
-                
-                const dStart = new Date(startDate);
-                const dToday = new Date(todayReal);
-                const diffTime = Math.abs(dToday - dStart);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                
-                // Si es solo 1 día de diferencia, asumimos que se quedó abierta la app y actualizamos a hoy.
-                if (diffDays <= 1) {
-                    startDate = todayReal;
-                    endDate = todayReal;
-                }
-            }
 
             const isGlobalAdmin = (
-                user?.role === 'ADMIN' || 
-                user?.role === 'SUPER ADMIN' || 
-                user?.role === 'JEFE_RRHH' || 
+                user?.role === 'ADMIN' ||
+                user?.role === 'SUPER ADMIN' ||
+                user?.role === 'JEFE_RRHH' ||
                 user?.position?.includes('JEFE DE GENTE') ||
-                user?.position?.includes('JEFE DE RRHH') ||
                 user?.position?.includes('GERENTE GENERAL') ||
-                (user?.permissions && user?.permissions['*']) ||
-                // Excepción Part Time ADM CENTRAL
-                (user?.position?.includes('ANALISTA DE GENTE') && user?.position?.includes('PART TIME') && 
-                 user?.sede === 'ADM. CENTRAL' && 
-                 (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'))
+                user?.position?.includes('ANALISTA DE GENTE') ||
+                (user?.permissions && user?.permissions['*'])
             );
 
             const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
@@ -1084,7 +1050,7 @@ export default function AttendanceList() {
 
         } catch (error) {
             console.error('Error exportando:', error)
-            alert('Error al exportar: ' + error.message)
+            showToast('Error al exportar: ' + error.message, 'error')
         } finally {
             setExporting(false)
         }
@@ -1094,7 +1060,7 @@ export default function AttendanceList() {
         if (!validationModal) return
         const supervisorId = user?.employee_id;
         if (!supervisorId) {
-            alert('Error: No se encontró un perfil de empleado asociado. No puedes validar asistencias.')
+            showToast('No se encontró un perfil de empleado asociado. No puedes validar asistencias.', 'error')
             return
         }
 
@@ -1115,10 +1081,10 @@ export default function AttendanceList() {
             await loadAttendances(currentPage)
             setValidationModal(null)
             setValidationNotes('')
-            alert(validationModal.approved ? 'Asistencia aprobada correctamente' : 'Asistencia rechazada')
+            showToast(validationModal.approved ? 'Asistencia aprobada correctamente' : 'Asistencia rechazada', 'success')
         } catch (error) {
             console.error('Error validando:', error)
-            alert('Error: ' + error.message)
+            showToast('Error: ' + error.message, 'error')
         } finally {
             setValidating(false)
         }
@@ -1237,7 +1203,7 @@ export default function AttendanceList() {
             const sheet = workbook.Sheets[sheetName]
             const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
             if (jsonData.length < 2) {
-                alert('El archivo parece estar vacío o sin cabeceras.')
+                showToast('El archivo parece estar vacío o sin cabeceras.', 'error')
                 return
             }
             const rows = jsonData.slice(1).map((row, idx) => ({

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import * as XLSX from 'xlsx'
+import * as XLSX from '@e965/xlsx'
 import { supabase } from '../lib/supabase'
 import { bulkImportEmployees } from '../services/bulkEmployees'
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Save, RefreshCw, X, Building2 } from 'lucide-react'

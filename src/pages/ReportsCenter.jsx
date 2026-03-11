@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import * as XLSX from 'xlsx'
+import * as XLSX from '@e965/xlsx'
 import { 
     FileText, 
     Download, 

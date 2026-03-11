@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from './ToastContext'
 
 const AuthContext = createContext({})
 
 export const useAuth = () => useContext(AuthContext)
 
 export const AuthProvider = ({ children }) => {
+  const { showToast } = useToast()
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -35,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth State Change:', event)
+      // Auth State Change: event
       if (!mounted) return;
 
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
@@ -72,16 +74,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
+  // Extrae la categoría genérica de un rol específico para el fallback en role_modules.
+  // Ejemplo: "JEFE DE OPERACIONES" → "JEFE", "ANALISTA COMERCIAL" → "ANALISTA"
+  const getRoleCategory = (roleName) => {
+    if (!roleName) return null
+    const name = roleName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    if (name.startsWith('JEFE')) return 'JEFE'
+    if (name.startsWith('GERENTE')) return 'GERENTE'
+    if (name.startsWith('SUPERVISOR')) return 'SUPERVISOR'
+    if (name.startsWith('COORDINADOR')) return 'COORDINADOR'
+    if (name.startsWith('ANALISTA')) return 'ANALISTA'
+    return null
+  }
+
   const fetchProfile = async (authUser) => {
     // Si ya tenemos el usuario cargado y es el mismo, evitamos recargar (opcional, pero ayuda a la estabilidad)
     // if (user && user.id === authUser.id) return; 
 
     try {
-      console.log('Buscando perfil para:', authUser.email);
+      // Buscando perfil de usuario
 
       // --- CASO ESPECIAL: SUPER ADMIN (admin@pauser.com) ---
       if (authUser.email === 'admin@pauser.com') {
-          console.log('⚡ SUPER ADMIN SYSTEM DETECTADO');
+          // Super Admin detectado
           const superAdminUser = {
               ...authUser,
               id: authUser.id, // ID de Auth
@@ -105,7 +120,7 @@ export const AuthProvider = ({ children }) => {
        // Usamos try/catch silencioso para la query por si la tabla roles aun no existe o no está vinculada
        try {
            // IMPORTANTE: Primero obtenemos el empleado simple para evitar recursión en RLS si la hay
-           const { data: simpleEmployee, error: simpleError } = await supabase
+           const { data: simpleEmployee } = await supabase
              .from('employees')
              .select('*, role_id') // Solo traemos role_id primero
              .ilike('email', authUser.email)
@@ -139,7 +154,7 @@ export const AuthProvider = ({ children }) => {
         // VALIDACIÓN DE USUARIO ACTIVO (NUEVO)
         if (employeeData.is_active === false) {
             console.error('Acceso denegado: Usuario inactivo (Baja)');
-            alert('Tu cuenta ha sido desactivada. Contacta a RRHH.');
+            showToast('Tu cuenta ha sido desactivada. Contacta a RRHH.', 'error');
             await supabase.auth.signOut();
             setUser(null);
             setSession(null);
@@ -150,7 +165,7 @@ export const AuthProvider = ({ children }) => {
         // Si tiene un rol asignado y ese rol tiene web_access = false, denegar acceso
         if (employeeData.roles && employeeData.roles.web_access === false) {
             console.error('Acceso denegado: El rol del usuario no tiene permisos para Web');
-            alert('Tu rol actual no tiene permisos para acceder a la plataforma Web.');
+            showToast('Tu rol actual no tiene permisos para acceder a la plataforma Web.', 'error');
             await supabase.auth.signOut();
             setUser(null);
             setSession(null);
@@ -158,56 +173,61 @@ export const AuthProvider = ({ children }) => {
         }
 
         // Combinar datos de auth y empleado
+        // Prioridad: rol relacional (FK) > campo role legado > employee_type
         const roleName = employeeData.roles?.name || employeeData.role || employeeData.employee_type;
-        
-        // Cargar permisos RBAC de módulos
-        let modulePermissions = {};
-        if (roleName) {
-            const { data: permsData } = await supabase
+        const roleNameUpper = roleName ? roleName.toUpperCase() : null;
+        // position suele tener el cargo exacto registrado en role_modules;
+        // se usa como segundo intento cuando el campo `role` tiene un valor legado sin coincidencia
+        const positionUpper = employeeData.position ? employeeData.position.toUpperCase() : null;
+
+        const buildPerms = (rows) => rows.reduce((acc, curr) => {
+            acc[curr.module_key] = {
+                read: curr.can_read,
+                write: curr.can_write,
+                delete: curr.can_delete
+            };
+            return acc;
+        }, {});
+
+        const queryRoleModules = async (name) => {
+            if (!name) return null;
+            const { data } = await supabase
                 .from('role_modules')
                 .select('module_key, can_read, can_write, can_delete')
-                .eq('role_name', roleName);
-            
-            if (permsData && permsData.length > 0) {
-                modulePermissions = permsData.reduce((acc, curr) => {
-                    acc[curr.module_key] = {
-                        read: curr.can_read,
-                        write: curr.can_write,
-                        delete: curr.can_delete
-                    };
-                    return acc;
-                }, {});
-            } else if (roleName === 'ADMIN' || roleName === 'SUPER ADMIN') {
-                // Fallback para ADMIN si no hay registros en role_modules: Acceso total
-                modulePermissions = { 
-                    '*': { read: true, write: true, delete: true } 
-                };
+                .ilike('role_name', name);
+            return data && data.length > 0 ? data : null;
+        };
+
+        // Cargar permisos RBAC de módulos
+        let modulePermissions = {};
+        if (roleNameUpper || positionUpper) {
+            // Intento 1: por nombre de rol (campo role / roles.name)
+            let rows = await queryRoleModules(roleNameUpper);
+
+            // Intento 2: por posición/cargo si el intento 1 falla y es diferente al rol
+            if (!rows && positionUpper && positionUpper !== roleNameUpper) {
+                rows = await queryRoleModules(positionUpper);
             }
 
-            // --- REGLA DE EXCEPCIÓN: ANALISTA DE GENTE Y GESTIÓN (ADM. CENTRAL) Y JEFE DE RRHH ---
-            // Si es Analista de CyG Y su sede es ADM. CENTRAL, O si es JEFE DE GENTE/RRHH, otorgar permisos de SUPER ADMIN implícitos
-            // Verificamos por nombre de rol, código de rol o cargo directo
-            const positionUpper = employeeData.position ? employeeData.position.toUpperCase() : '';
-            const roleUpper = roleName ? roleName.toUpperCase() : '';
-
-            if ((roleUpper === 'ANALISTA DE GENTE Y GESTION' || roleUpper === 'ANALISTA_RRHH' || positionUpper === 'ANALISTA DE GENTE Y GESTIÓN') && 
-                employeeData.sede === 'ADM. CENTRAL' && 
-                employeeData.business_unit === 'ADMINISTRACION') {
-                console.log('⚡ ACCESO VIP DETECTADO: Analista ADM. CENTRAL -> Permisos Totales');
-                modulePermissions = { 
-                    '*': { read: true, write: true, delete: true } 
-                };
-            }
-            
-            // Regla para JEFE DE RRHH / JEFE DE GENTE Y GESTIÓN / GERENTE
-            if (roleUpper === 'JEFE_RRHH' || 
-                positionUpper.includes('JEFE DE GENTE') || 
-                positionUpper.includes('GERENTE') ||
-                positionUpper.includes('GERENTE GENERAL')) {
-                 console.log('⚡ ACCESO VIP DETECTADO: JEFE/GERENTE -> Permisos Totales');
-                 modulePermissions = { 
-                    '*': { read: true, write: true, delete: true } 
-                };
+            if (rows) {
+                modulePermissions = buildPerms(rows);
+            } else {
+                // Fallback: categoría genérica (JEFE, GERENTE, SUPERVISOR, etc.)
+                // Intentar con position primero ya que suele ser más específico
+                const category = getRoleCategory(positionUpper) || getRoleCategory(roleNameUpper);
+                if (category) {
+                    const categoryRows = await queryRoleModules(category);
+                    if (categoryRows) {
+                        modulePermissions = buildPerms(categoryRows);
+                    }
+                }
+                // Roles administrativos sin entrada → acceso total
+                const effectiveRole = positionUpper || roleNameUpper || '';
+                if (!Object.keys(modulePermissions).length &&
+                    (effectiveRole === 'ADMIN' || effectiveRole === 'SUPER ADMIN' || effectiveRole === 'ADMINISTRADOR GENERAL' ||
+                     roleNameUpper === 'ADMIN' || roleNameUpper === 'SUPER ADMIN' || roleNameUpper === 'ADMINISTRADOR GENERAL')) {
+                    modulePermissions = { '*': { read: true, write: true, delete: true } };
+                }
             }
         }
 
@@ -223,22 +243,20 @@ export const AuthProvider = ({ children }) => {
           business_unit: employeeData.business_unit,
           profile: employeeData
         };
-        console.log('Usuario Final Configurado:', finalUser);
+        // Usuario configurado correctamente
         setUser(finalUser)
       } else {
-        console.warn('Perfil NO encontrado en ninguna búsqueda');
-        // Fallback rápido
-        setUser({
-            ...authUser,
-            employee_id: authUser.id,
-            role: 'ADMIN', // Fallback temporal
-            full_name: authUser.email.split('@')[0],
-            profile: null
-        })
+        // Usuario autenticado en Supabase Auth pero sin registro en employees → acceso denegado
+        // Acceso denegado: sin perfil en employees
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
       }
     } catch (err) {
       console.error('Error fetching profile:', err)
-      setUser(authUser)
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
     } finally {
       setLoading(false)
     }

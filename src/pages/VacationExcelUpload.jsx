@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import * as XLSX from 'xlsx'
+import * as XLSX from '@e965/xlsx'
 import { bulkUpdateVacations } from '../services/vacations'
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Save, RefreshCw, X, Download } from 'lucide-react'
 
@@ -249,8 +249,7 @@ const readExcel = (file) => {
                     legacy_days: item.legacy_days
                 }));
 
-            console.log(`🚀 Enviando ${payload.length} registros al servidor...`);
-            console.log('📦 Primeros 3 registros a enviar:', payload.slice(0, 3));
+            console.log(`Enviando ${payload.length} registros al servidor...`);
 
             const { data, error } = await bulkUpdateVacations(payload);
             

@@ -217,9 +217,6 @@ export default function VacationDashboard() {
             let allowedIds = null;
             if (!isGlobalAdmin) {
                  const { data: allowedEmployees } = await supabase.rpc('get_employees_by_user_area')
-                 console.log('Total allowedEmployees:', allowedEmployees?.length)
-                 console.log('allowedEmployees IDs:', allowedEmployees?.map(e => e.id))
-                 console.log('Estructura de allowedEmployees[0]:', allowedEmployees?.[0])
                  
                  if (allowedEmployees) {
                      allowedIds = new Set(allowedEmployees.map(e => e.id))
@@ -236,10 +233,6 @@ export default function VacationDashboard() {
 
             // Pasamos queryBusinessUnit al servicio para filtrado server-side
             const { data, error } = await getVacationOverview(querySede, searchParam, queryBusinessUnit)
-                    console.log('Empleados de RPC vacation_overview:', data?.length)
-                    console.log('Empleados después de allowedIds filter:', 
-                        data?.filter(emp => allowedIds ? allowedIds.has(emp.employee_id) : true).length
-                    )
             if (error) throw error
             
             let filteredResult = data || []

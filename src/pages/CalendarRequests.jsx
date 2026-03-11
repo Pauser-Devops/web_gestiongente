@@ -4,7 +4,7 @@ import { toSecureUrl } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { ChevronLeft, ChevronRight, Filter, Users, Calendar, Clock, Info, Download } from 'lucide-react'
 import Modal from '../components/ui/Modal'
-import * as XLSX from 'xlsx'
+import * as XLSX from '@e965/xlsx'
 import { useToast } from '../context/ToastContext'
 
 const CalendarRequests = () => {

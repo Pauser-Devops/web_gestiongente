@@ -34,19 +34,25 @@ export default function Login() {
       return
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setError('El formato del correo electrónico no es válido')
+      setLoading(false)
+      return
+    }
+
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres')
+      setLoading(false)
+      return
+    }
+
     try {
-      console.log('Intentando iniciar sesión con:', email)
       const { data, error } = await signInWithEmail(email, password)
-      
-      if (error) {
-        console.error('Error detallado de Supabase:', error)
-        throw error
-      }
-      
-      console.log('Login exitoso, esperando actualización de sesión...')
+
+      if (error) throw error
       
     } catch (err) {
-      console.error('Error capturado:', err)
       if (err.message.includes('Invalid login credentials')) {
         setError('Correo o contraseña incorrectos.')
       } else if (err.message.includes('Email not confirmed')) {

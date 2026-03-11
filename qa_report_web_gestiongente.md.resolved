@@ -1,0 +1,451 @@
+# 📋 Informe de QA — Sistema `web_gestiongente`
+**Tester:** Senior QA Engineer  
+**Fecha de Revisión:** 10 de Marzo, 2026  
+**Versión del Sistema:** 0.0.0 (Producción)  
+**Stack:** React 18 + Vite + Supabase (self-hosted en servidor Elastika)  
+**Base de Datos:** Supabase en IP `161.132.48.71` — Puerto HTTPS: `8443` | Puerto HTTP legacy: `8000`
+
+---
+
+## 1. 🗺️ Mapa de Navegación del Sistema
+
+### 1.1 Flujo de Acceso General
+
+```
+[Usuario] → /login (público)
+              │
+              ▼
+      [AuthContext: signInWithEmail]
+              │ Supabase Auth → POST https://161.132.48.71:8443/auth/v1/token
+              │
+              ▼
+      [fetchProfile(authUser)]
+              │ SELECT employees WHERE email = {email}
+              │ SELECT roles WHERE id = {role_id}
+              │ SELECT role_modules WHERE role_name = {roleName}
+              │
+              ▼
+      [PrivateLayout] → verifica session → DashboardLayout
+              │
+              ▼
+         /  (Dashboard)  ←── Ruta raíz protegida
+```
+
+### 1.2 Rutas del Sistema (21 módulos)
+
+| Ruta | Módulo RBAC | Componente | Acción Requerida |
+|------|-------------|------------|------------------|
+| `/login` | Pública | [Login.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/Login.jsx) | — |
+| `/` | `dashboard` | [Dashboard.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/Dashboard.jsx) | read |
+| `/employees` | `employees` | [EmployeesList.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/EmployeesList.jsx) | read |
+| `/register-employee` | `employees` | [RegisterEmployee.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/RegisterEmployee.jsx) | **write** |
+| `/edit-employee/:id` | `employees` | [RegisterEmployee.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/RegisterEmployee.jsx) | **write** |
+| `/employees/:sede` | `employees` | [EmployeesList.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/EmployeesList.jsx) | read |
+| `/my-team` | `employees` | [MyTeam.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/MyTeam.jsx) | read |
+| `/attendance-list` | `attendance` | [AttendanceList.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/AttendanceList.jsx) | read |
+| `/lifecycle` | `lifecycle` | [EmployeeLifecycle.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/EmployeeLifecycle.jsx) | read |
+| `/requests` | `requests` | [RequestsList.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/RequestsList.jsx) | read |
+| `/calendar` | `calendar` | [CalendarRequests.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/CalendarRequests.jsx) | read |
+| `/roles` | `settings` | [RolesManagement.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/RolesManagement.jsx) | read |
+| `/positions` | `config` | [PositionsManagement.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/PositionsManagement.jsx) | read |
+| `/areas` | `config` | [AreasManagement.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/AreasManagement.jsx) | read |
+| `/organization-structure` | `settings` | [OrganizationStructure.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/OrganizationStructure.jsx) | **write** |
+| `/hierarchy-management` | `settings` | [HierarchyManagement.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/HierarchyManagement.jsx) | **write** |
+| `/mobile-access-config` | `settings` | [MobileAccessConfig.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/MobileAccessConfig.jsx) | read |
+| `/papeleta/:id` | `requests` | [PapeletaVacaciones.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/components/PapeletaVacaciones.jsx) | read |
+| `/vacaciones` | `vacations` | [VacationDashboard.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/VacationDashboard.jsx) | read |
+| `/vacaciones/carga-masiva` | `vacations` | [VacationExcelUpload.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/VacationExcelUpload.jsx) | **write** |
+| `/reports` | `dashboard` | [ReportsCenter.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/ReportsCenter.jsx) | read |
+
+### 1.3 Jerarquía de Roles Identificada
+
+```
+SUPER ADMIN (admin@pauser.com) — hardcoded, bypass total de RBAC
+    │
+ADMIN — bypass total de RBAC (rol 'ADMIN' en tabla roles)
+    │
+JEFE_RRHH / JEFE DE GENTE / GERENTE — permisos totales vía excepción en código
+    │
+ANALISTA DE GENTE Y GESTIÓN (sede=ADM. CENTRAL) — permisos totales vía excepción
+    │
+ANALISTA / JEFE / SUPERVISOR / COORDINADOR / GERENTE — acceso implícito a módulos básicos
+    │
+USUARIO ESTÁNDAR — solo acceso según tabla role_modules
+```
+
+---
+
+## 2. 🔌 Conectividad Web → Base de Datos (Elastika/Supabase)
+
+### 2.1 Configuración de Conexión
+
+**Archivo:** [src/lib/supabase.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/lib/supabase.js)  
+**URL activa:** `https://161.132.48.71:8443`  
+**Clave:** JWT `anon` con expiración hasta el año 2031
+
+```js
+// Conexión principal
+const supabase = createClient(
+  'https://161.132.48.71:8443',  // HTTPS (correcto)
+  '<anon_key>'
+)
+```
+
+> [!IMPORTANT]
+> El servidor Elastika usa un **certificado SSL auto-firmado** en una IP pública. Los navegadores modernos pueden bloquear la conexión con error `NET::ERR_CERT_AUTHORITY_INVALID`. Esto requiere que el usuario acepte manualmente la excepción de seguridad o que se instale un certificado válido.
+
+### 2.2 Patrón de Llamadas a la Base de Datos
+
+El sistema usa **dos patrones** para acceder a Supabase:
+
+| Patrón | Descripción | Usado en |
+|--------|-------------|----------|
+| **Direct Table Query** | `supabase.from('tabla').select(...)` | `employees`, `vacation_requests`, `roles`, `role_modules`, `job_positions`, `areas` |
+| **RPC (Remote Procedure Call)** | `supabase.rpc('function_name', params)` | Dashboard stats, attendance, hierarchy, vacations bulk, signing authority |
+
+### 2.3 Funciones RPC Invocadas desde la Web
+
+| Función RPC | Servicio | Descripción |
+|-------------|----------|-------------|
+| `get_monthly_dashboard_metrics` | [dashboard.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/dashboard.js) | KPIs mensuales del dashboard |
+| `get_main_dashboard_stats` | [dashboard.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/dashboard.js) | Estadísticas principales (KPIs) |
+| `assign_supervisor_bulk` | [employees.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/employees.js) | Asignación masiva de supervisores |
+| `get_employees_hierarchy_data` | [employees.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/employees.js) | Datos de jerarquía de empleados |
+| `supervisor_validate_attendance` | [attendance.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/attendance.js) | Validación de asistencia |
+| `bulk_import_attendance` | [attendance.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/attendance.js) | Carga masiva de asistencias |
+| `register_manual_attendance` | [attendance.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/attendance.js) | Registro manual de asistencia |
+| `get_pending_validations` | [attendance.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/attendance.js) | Validaciones pendientes |
+| `change_employee_password` | [attendance.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/attendance.js) | Cambio de contraseña de empleado |
+| `get_team_attendance` | [attendance.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/attendance.js) | Asistencia del equipo de un supervisor |
+| `get_vacation_overview` | [vacations.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/vacations.js) | Resumen/Kardex de vacaciones |
+| `bulk_update_vacations` | [vacations.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/vacations.js) | Carga masiva de histórico de vacaciones |
+| `get_signing_authority` | [requests.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/requests.js) | Firmante de papeletas |
+
+---
+
+## 3. 🐛 Registro de Problemas Identificados
+
+### 🔴 CRÍTICOS (Bloquean funcionalidad o representan riesgo de seguridad)
+
+---
+
+#### BUG-001 — Fallback de Seguridad Asigna Rol ADMIN a Usuarios No Encontrados
+**Archivo:** [src/context/AuthContext.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/context/AuthContext.jsx) — Líneas 228–237  
+**Severidad:** 🔴 CRÍTICO  
+**Tipo:** Seguridad / Lógica de Negocio
+
+**Descripción:**  
+Si un usuario tiene credenciales válidas en Supabase Auth pero **no existe en la tabla `employees`**, el sistema le asigna automáticamente el rol `'ADMIN'` como fallback, otorgándole acceso total al sistema.
+
+```js
+// CÓDIGO PROBLEMÁTICO (líneas 231-235)
+setUser({
+    ...authUser,
+    employee_id: authUser.id,
+    role: 'ADMIN', // ⚠️ Fallback temporal - RIESGO DE SEGURIDAD
+    full_name: authUser.email.split('@')[0],
+    profile: null
+})
+```
+
+**Impacto:** Cualquier usuario que tenga acceso al sistema Supabase Auth pero cuyo registro en `employees` sea eliminado o no exista, obtiene automáticamente permisos de administrador.
+
+**Fix propuesto:**
+```js
+// Reemplazar el fallback por denegación de acceso
+await supabase.auth.signOut();
+setUser(null);
+// Mostrar mensaje: "Usuario no registrado en el sistema"
+```
+
+---
+
+#### BUG-002 — Protocolo HTTP vs HTTPS en URLs de Storage (Inconsistencia de Puertos)
+**Archivo:** [src/lib/supabase.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/lib/supabase.js) — Líneas 12–17  
+**Severidad:** 🔴 CRÍTICO  
+**Tipo:** Conectividad / Datos Corruptos
+
+**Descripción:**  
+La app móvil registra URLs de fotos de perfil con protocolo `http://` en el puerto `8000`, pero la API web funciona en `https://` en el puerto `8443`. Esto requiere un parche manual en el código.
+
+```js
+// Parche manual en producción (síntoma de data inconsistente en BD)
+export const toSecureUrl = (url) => {
+  return url.replace('http://161.132.48.71:8000', 'https://161.132.48.71:8443')
+}
+```
+
+**Impacto:** Las fotos de perfil guardadas por la app móvil pueden no cargar correctamente en la web. La existencia de este parche indica que datos legados en la BD tienen URLs incorrectas.
+
+**Fix propuesto:** Ejecutar una migración de datos para actualizar todas las URLs existentes en BD + un trigger en Supabase que normalice nuevas inserciones.
+
+---
+
+#### BUG-003 — Certificado SSL Auto-firmado en Servidor Elastika
+**Archivo:** [.env](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/.env)  
+**Severidad:** 🔴 CRÍTICO  
+**Tipo:** Conectividad / Experiencia de Usuario
+
+**Descripción:**  
+El servidor Elastika usa la IP pública `161.132.48.71:8443` con un certificado SSL que no está emitido por una CA reconocida. Los navegadores bloquean conexiones a IPs con certificados auto-firmados mostrando advertencias de seguridad.
+
+**Síntoma esperado:** El navegador muestra `ERR_CERT_AUTHORITY_INVALID` o `Your connection is not private`. La aplicación puede fallar completamente en el primer acceso hasta que el usuario acepte el certificado manualmente.
+
+**Fix propuesto:** Instalar un certificado SSL válido (Let's Encrypt) con un dominio DNS configurado en lugar de IP directa, o configurar un proxy inverso (Nginx) con certificado válido.
+
+---
+
+### 🟠 ALTOS (Afectan funcionalidad importante)
+
+---
+
+#### BUG-004 — Función "¿Olvidó su contraseña?" No Está Implementada
+**Archivo:** [src/pages/Login.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/Login.jsx) — Línea 254  
+**Severidad:** 🟠 ALTO  
+**Tipo:** Funcionalidad Faltante / UX
+
+**Descripción:**  
+El botón "¿Olvidó su contraseña?" es un `<a href="#">` sin funcionalidad. No hay ninguna pantalla de recuperación de contraseña ni integración con el sistema de email de Supabase.
+
+```jsx
+// Sin funcionalidad real
+<a href="#" className="...">¿Olvidó su contraseña?</a>
+```
+
+**Impacto:** Los usuarios que olviden su contraseña no tienen forma de recuperar acceso por su cuenta. Requieren intervención manual de un administrador.
+
+---
+
+#### BUG-005 — Checkbox "Recordarme" No Tiene Funcionalidad
+**Archivo:** [src/pages/Login.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/Login.jsx) — Líneas 246–252  
+**Severidad:** 🟠 ALTO  
+**Tipo:** Funcionalidad Faltante / UX
+
+**Descripción:**  
+El checkbox "Recordarme" existe visualmente pero no está conectado a ningún estado ni lógica. No cambia el comportamiento de la sesión.
+
+**Fix propuesto:** Conectar con `supabase.auth.signInWithPassword` usando persistencia de sesión configurada en el cliente Supabase, o directamente manipular `localStorage`.
+
+---
+
+#### BUG-006 — Fallback de Firmante Hardcodeado en Código Fuente
+**Archivo:** [src/services/requests.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/requests.js) — Líneas 14–22  
+**Severidad:** 🟠 ALTO  
+**Tipo:** Datos Hardcodeados / Mantenibilidad
+
+**Descripción:**  
+Cuando la RPC `get_signing_authority` falla, el sistema devuelve datos personales hardcodeados de una persona real directamente en el código fuente.
+
+```js
+return { 
+  data: {
+    full_name: "GIANCARLO URBINA GAITAN",  // ⚠️ Dato personal hardcodeado
+    dni: "18161904",                         // ⚠️ DNI en código fuente
+    position: "REPRESENTANTE LEGAL",
+    rule: "FALLBACK_ERROR"
+  }, 
+  error 
+}
+```
+
+**Impacto:** 
+1. Si la persona cambia de cargo, se necesita modificar el código y redesplegar.
+2. Los datos personales (DNI) no deben estar en repositorios de código fuente.
+3. Si la RPC falla, las papeletas se generan con datos posiblemente incorrectos sin notificar al usuario.
+
+---
+
+#### BUG-007 — Versión Legacy de RPC `get_vacation_overview` Indica Desincronización de BD
+**Archivo:** [src/services/vacations.js](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/services/vacations.js) — Líneas 8–23  
+**Severidad:** 🟠 ALTO  
+**Tipo:** Deuda Técnica / Fragilidad
+
+**Descripción:**  
+El servicio detecta en runtime si la función RPC existe con 3 o 2 parámetros, indicando que la BD puede estar en un estado de versión diferente a lo esperado.
+
+```js
+// Error string comparison para detectar versión de función en BD
+if (error.message.includes('function get_vacation_overview(...) does not exist')) {
+    // Fallback a versión legacy
+}
+```
+
+**Impacto:** Esto es frágil. Si Supabase cambia el formato del mensaje de error, el fallback deja de funcionar y el módulo de vacaciones falla completamente.
+
+---
+
+### 🟡 MEDIOS (Afectan experiencia de usuario o calidad)
+
+---
+
+#### BUG-008 — Múltiples Excepciones RBAC Hardcodeadas en Código
+**Archivo:** [src/components/ProtectedRoute.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/components/ProtectedRoute.jsx) — Líneas 47–79  
+**Severidad:** 🟡 MEDIO  
+**Tipo:** Arquitectura / Mantenibilidad
+
+**Descripción:**  
+El sistema tiene múltiples reglas de acceso hardcodeadas por rol/cargo directamente en el componente [ProtectedRoute](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/components/ProtectedRoute.jsx#4-95), sin pasar por la tabla `role_modules`:
+
+- Analistas, Jefes, Supervisores, Coordinadores, Gerentes tienen bypass automático para módulos básicos.
+- `JEFE_RRHH`, `JEFE DE GENTE`, `GERENTE GENERAL` reciben permisos totales vía código.
+- `ANALISTA DE GENTE Y GESTIÓN` en `ADM. CENTRAL` recibe permisos totales.
+
+**Impacto:** Los permisos no son gestionables desde la interfaz de administración. Cualquier cambio organizacional requiere modificar y redesplegar el código.
+
+---
+
+#### BUG-009 — `console.log` de Datos Sensibles en Producción
+**Archivos:** [AuthContext.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/context/AuthContext.jsx), [Login.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/Login.jsx), múltiples servicios  
+**Severidad:** 🟡 MEDIO  
+**Tipo:** Seguridad / Información Expuesta
+
+**Descripción:**  
+El sistema imprime en consola del navegador información sensible en producción:
+
+```js
+console.log('Intentando iniciar sesión con:', email)      // Login.jsx:38
+console.log('⚡ SUPER ADMIN SYSTEM DETECTADO')             // AuthContext.jsx:84
+console.log('Usuario Final Configurado:', finalUser)       // AuthContext.jsx:226 (incluye datos completos del empleado)
+```
+
+**Impacto:** Cualquier persona con acceso a las DevTools del navegador puede ver el email del usuario intentando loguear, detectar cuentas privilegiadas, y ver el perfil completo del usuario incluyendo permisos.
+
+---
+
+#### BUG-010 — Validación de Formulario de Login Incompleta
+**Archivo:** [src/pages/Login.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/pages/Login.jsx) — Líneas 31–35  
+**Severidad:** 🟡 MEDIO  
+**Tipo:** UX / Validación
+
+**Descripción:**  
+La validación de login solo verifica que los campos no estén vacíos. No valida:
+- Formato de email antes de enviar a Supabase.
+- Longitud mínima de contraseña.
+
+Esto genera una llamada innecesaria a la API si el usuario escribe un email mal formateado.
+
+---
+
+#### BUG-011 — Alert Nativo Usado para Errores de Acceso
+**Archivo:** [src/context/AuthContext.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/context/AuthContext.jsx) — Líneas 142, 153  
+**Severidad:** 🟡 MEDIO  
+**Tipo:** UX / Consistencia
+
+**Descripción:**  
+Para errores de usuario inactivo o sin permisos web, el sistema usa `alert()` nativo del navegador, lo cual es inconsistente con el sistema de notificaciones Toast que existe en la app.
+
+```js
+alert('Tu cuenta ha sido desactivada. Contacta a RRHH.')      // Línea 142
+alert('Tu rol actual no tiene permisos para acceder a la plataforma Web.')  // Línea 153
+```
+
+---
+
+#### BUG-012 — Sin Manejo de Tiempo de Espera (Timeout) en Llamadas a Supabase
+**Archivos:** Todos los servicios en `src/services/`  
+**Severidad:** 🟡 MEDIO  
+**Tipo:** Resiliencia / UX
+
+**Descripción:**  
+Ninguna llamada a Supabase tiene configurado un timeout. Si el servidor Elastika tarda o no responde, el usuario ve un spinner infinito sin mensaje de error.
+
+**Fix propuesto:** Usar `AbortController` con un timeout de 15-30 segundos y mostrar mensaje de error apropiado.
+
+---
+
+### 🔵 BAJOS (Mejoras menores / deuda técnica)
+
+---
+
+#### BUG-013 — Dependencia `puppeteer-core` y `@sparticuz/chromium` en Dependencias de Producción
+**Archivo:** [package.json](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/package.json) — Líneas 13, 19  
+**Severidad:** 🔵 BAJO  
+**Tipo:** Configuración / Bundle Size
+
+**Descripción:**  
+Las librerías `puppeteer-core` (~100MB) y `@sparticuz/chromium` son dependencias de servidor (usadas solo para generación de PDF en la función `api/generate-pdf.js`). Están listadas en `dependencies` en lugar de `devDependencies` o como dependencia exclusiva del entorno serverless.
+
+**Impacto:** No afecta la funcionalidad pero aumenta innecesariamente el tamaño del bundle de npm instalado.
+
+---
+
+#### BUG-014 — `xlsx` Instalado desde CDN Externo en lugar de npm Registry
+**Archivo:** [package.json](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/package.json) — Línea 24  
+**Severidad:** 🔵 BAJO  
+**Tipo:** Seguridad de Cadena de Suministro
+
+**Descripción:**  
+```json
+"xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
+```
+Esta dependencia se instala desde una URL externa no verificable por npm. Si el CDN es comprometido, la librería puede incluir código malicioso.
+
+---
+
+#### BUG-015 — Sin Ruta 404 Personalizada
+**Archivo:** [src/App.jsx](file:///Users/edwardstevenquispesanchez/Documents/Pasuer/web_gestiongente/src/App.jsx) — Línea 197  
+**Severidad:** 🔵 BAJO  
+**Tipo:** UX
+
+**Descripción:**  
+Cualquier URL no reconocida redirige silenciosamente al Dashboard (`/`) sin informar al usuario que la ruta no existe.
+
+---
+
+## 4. 📊 Resumen de Hallazgos
+
+| Severidad | Cantidad | Área Principal |
+|-----------|----------|----------------|
+| 🔴 Crítico | 3 | Seguridad, Conectividad |
+| 🟠 Alto | 4 | Funcionalidad, Datos |
+| 🟡 Medio | 5 | UX, Arquitectura |
+| 🔵 Bajo | 3 | Configuración, Deuda Técnica |
+| **Total** | **15** | |
+
+---
+
+## 5. ✅ Recomendaciones Prioritarias
+
+### Acción Inmediata (Esta Sprint)
+1. **BUG-001**: Eliminar el fallback de rol `ADMIN` — bloquear acceso si no existe perfil en `employees`.
+2. **BUG-003**: Instalar certificado SSL válido en servidor Elastika o configurar dominio + proxy.
+3. **BUG-006**: Mover datos del firmante a la base de datos y manejarlo como configuración.
+
+### Corto Plazo (Próximo Sprint)
+4. **BUG-004**: Implementar flujo de recuperación de contraseña usando `supabase.auth.resetPasswordForEmail`.
+5. **BUG-002**: Migración de datos para normalizar URLs de storage en BD.
+6. **BUG-009**: Remover `console.log` con datos sensibles o reemplazarlos con logger condicionado a `NODE_ENV`.
+
+### Mediano Plazo
+7. **BUG-008**: Migrar las excepciones RBAC hardcodeadas a la tabla `role_modules` para gestión dinámica.
+8. **BUG-012**: Implementar timeouts en todas las llamadas a Supabase con mensajes de error apropiados.
+
+---
+
+## 6. 🌐 Estado de Conectividad Web → Supabase (Resumen)
+
+```
+[Browser] ──HTTPS:8443──► [Elastika Server]
+                                │
+                          [Supabase Engine]
+                                │
+                    ┌───────────┼───────────┐
+                    │           │           │
+               [Auth]      [Database]  [Storage]
+            /auth/v1/    PostgreSQL   Archivos/Fotos
+            token         + RLS        (Storage API)
+                          + RPCs
+```
+
+**Estado de conexión observado:**
+- ✅ Autenticación: Funcional (vía `supabase.auth.signInWithPassword`)
+- ✅ Lecturas de tabla: Funcional (con limitaciones de RLS por rol)
+- ✅ Escrituras de tabla: Funcional (employees, vacation_requests)
+- ✅ RPCs: 13 funciones identificadas y en uso
+- ⚠️ Storage: Funcional pero con problema de protocolo HTTP/HTTPS legacy (BUG-002)
+- ⚠️ Certificado SSL: Puede generar advertencias en navegador (BUG-003)
+
+---
+
+*Reporte generado el 10 de Marzo de 2026 por análisis estático de código fuente.*  
+*Para validación completa se recomienda ejecutar pruebas de integración con acceso al servidor Elastika.*

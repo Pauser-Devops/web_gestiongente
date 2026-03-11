@@ -10,18 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^143.0.4",
     "@supabase/supabase-js": "^2.90.1",
     "@tailwindcss/vite": "^4.1.18",
     "dotenv": "^17.3.1",
     "html2pdf.js": "^0.14.0",
     "lucide-react": "^0.562.0",
-    "puppeteer-core": "^24.37.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.22.3",
     "recharts": "^2.12.3",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
+    "@e965/xlsx": "^0.20.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

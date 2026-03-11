@@ -5,23 +5,11 @@ import { supabase } from '../lib/supabase'
  */
 export const getVacationOverview = async (sede, search, businessUnit) => {
     try {
-        // Intento 1: Llamada con 3 parámetros (Versión nueva con businessUnit)
         const { data, error } = await supabase.rpc('get_vacation_overview', {
             p_sede: sede || null,
             p_search: search || null,
             p_business_unit: businessUnit || null
         })
-        
-        if (error && error.message && error.message.includes('function get_vacation_overview(p_sede => text, p_search => text, p_business_unit => text) does not exist')) {
-            // Fallback: Llamada antigua con 2 parámetros
-            console.warn('RPC get_vacation_overview con 3 parámetros no existe. Usando versión legacy.');
-            const { data: legacyData, error: legacyError } = await supabase.rpc('get_vacation_overview', {
-                p_sede: sede || null,
-                p_search: search || null
-            })
-            return { data: legacyData, error: legacyError }
-        }
-
         return { data, error }
     } catch (e) {
         console.error('Error en getVacationOverview:', e);

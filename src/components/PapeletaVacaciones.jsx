@@ -107,7 +107,6 @@ const PapeletaFinal = () => {
         
         if (data?.employee_id) {
           const { data: signerData } = await getSigningAuthority(data.employee_id)
-          console.log('SIGNER DATA FETCHED:', signerData)
           if (signerData) setSigner(signerData)
         }
       } catch (err) {
