@@ -126,12 +126,13 @@ export const AuthProvider = ({ children }) => {
              .ilike('email', authUser.email)
              .maybeSingle();
 
-           // Si hay error de servidor (503, PGRST002 schema cache, etc.), no hacer logout
+           // Si hay error de servidor o red, no hacer logout
            if (empError) {
+               const isNetworkError = !empError.code || empError.message?.includes('Failed to fetch') || empError.message?.includes('NetworkError') || empError.message?.includes('TypeError');
                const isServerError = empError.code === 'PGRST002' || empError.message?.includes('schema cache') || empError.status >= 500;
-               if (isServerError) {
-                   console.warn('Error temporal del servidor al cargar perfil, manteniendo sesión:', empError.message);
-                   showToast('El servidor está experimentando problemas temporales. Intenta recargar la página.', 'error');
+               if (isNetworkError || isServerError) {
+                   console.warn('Error temporal de red/servidor al cargar perfil, manteniendo sesión:', empError.message);
+                   showToast('Error de conexión. Intenta recargar la página.', 'error');
                    setLoading(false);
                    return; // Mantener sesión, no hacer logout
                }
@@ -267,7 +268,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Error fetching profile:', err)
       // Solo hacer logout si NO es un error temporal del servidor
-      const isServerError = err?.code === 'PGRST002' || err?.message?.includes('schema cache') || err?.status >= 500 || err?.name === 'AbortError';
+      const isServerError = err?.code === 'PGRST002' || err?.message?.includes('schema cache') || err?.status >= 500 || err?.name === 'AbortError' || err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError') || !err?.code;
       if (!isServerError) {
           await supabase.auth.signOut();
           setUser(null);
