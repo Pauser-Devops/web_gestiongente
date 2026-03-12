@@ -27,7 +27,6 @@ export const supabase = createClient(supabaseUrl || '', supabaseKey || '', {
 // http://161.132.48.71:8000 → https://161.132.48.71:8443
 export const toSecureUrl = (url) => {
   if (!url || typeof url !== 'string') return null
-  if (url.startsWith('https://')) return url
   return url.replace('http://161.132.48.71:8000', 'https://supabase.pauserdistribucionessac.com')
             .replace('https://161.132.48.71:8443', 'https://supabase.pauserdistribucionessac.com')
 }
