@@ -120,15 +120,27 @@ export const AuthProvider = ({ children }) => {
        // Usamos try/catch silencioso para la query por si la tabla roles aun no existe o no está vinculada
        try {
            // IMPORTANTE: Primero obtenemos el empleado simple para evitar recursión en RLS si la hay
-           const { data: simpleEmployee } = await supabase
+           const { data: simpleEmployee, error: empError } = await supabase
              .from('employees')
              .select('*, role_id') // Solo traemos role_id primero
              .ilike('email', authUser.email)
              .maybeSingle();
-             
+
+           // Si hay error de servidor (503, PGRST002 schema cache, etc.), no hacer logout
+           if (empError) {
+               const isServerError = empError.code === 'PGRST002' || empError.message?.includes('schema cache') || empError.status >= 500;
+               if (isServerError) {
+                   console.warn('Error temporal del servidor al cargar perfil, manteniendo sesión:', empError.message);
+                   showToast('El servidor está experimentando problemas temporales. Intenta recargar la página.', 'error');
+                   setLoading(false);
+                   return; // Mantener sesión, no hacer logout
+               }
+               console.error('Error cargando empleado:', empError);
+           }
+
            if (simpleEmployee) {
                employeeData = simpleEmployee;
-               
+
                // Si tiene role_id, hacemos fetch manual del rol (2 pasos) para romper cualquier ciclo de query compleja
                if (simpleEmployee.role_id) {
                    const { data: roleData } = await supabase
@@ -136,7 +148,7 @@ export const AuthProvider = ({ children }) => {
                      .select('*')
                      .eq('id', simpleEmployee.role_id)
                      .single();
-                   
+
                    if (roleData) {
                        employeeData.roles = roleData;
                    }
@@ -254,9 +266,16 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Error fetching profile:', err)
-      await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
+      // Solo hacer logout si NO es un error temporal del servidor
+      const isServerError = err?.code === 'PGRST002' || err?.message?.includes('schema cache') || err?.status >= 500 || err?.name === 'AbortError';
+      if (!isServerError) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setSession(null);
+      } else {
+          console.warn('Error temporal del servidor, manteniendo sesión activa');
+          showToast('El servidor está experimentando problemas temporales. Intenta recargar la página.', 'error');
+      }
     } finally {
       setLoading(false)
     }
