@@ -195,7 +195,7 @@ function App() {
                   <VacationDashboard />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/vacaciones/carga-masiva" element={
                 <ProtectedRoute module="vacations" requiredAction="write">
                   <VacationExcelUpload />
