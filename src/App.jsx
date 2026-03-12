@@ -68,7 +68,7 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <Router>
+        <Router basename="/sebi-web">
           <Routes>
             <Route path="/login" element={<Login />} />
 
