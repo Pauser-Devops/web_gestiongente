@@ -16,6 +16,13 @@ import {
 import { getOrganizationStructure } from '../services/organization'
 import { getEmployees } from '../services/employees'
 
+// ── Cargos con derecho a HE ───────────────────────────────────────────────────
+const OT_POSITIONS = ['AUXILIAR DE ALMACEN', 'AUXILIAR DE ALMACÉN', 'MONTACARGUISTA', 'CONFERENTE', 'COMPAGINADOR']
+const qualifiesForOT = (position) => {
+  const pos = (position || '').toUpperCase()
+  return OT_POSITIONS.some((p) => pos === p) || (pos.includes('AUXILIAR') && pos.includes('ALMAC'))
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const normalize = (str) =>
   str ? str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() : ''
@@ -37,6 +44,7 @@ const toPeruTime = (isoStr) => {
 
 const EMPTY_SCHEDULE = {
   name: '',
+  shift: '',
   sede: '',
   business_unit: '',
   position: '',
@@ -197,6 +205,7 @@ export default function SchedulesManagement() {
     const hasBonus = !!(schedule.bonus_start && schedule.bonus_end)
     setForm({
       name: schedule.name || '',
+      shift: schedule.shift || '',
       sede: schedule.sede || '',
       business_unit: schedule.business_unit || '',
       position: schedule.position || '',
@@ -220,6 +229,7 @@ export default function SchedulesManagement() {
     setSaving(true)
     const payload = {
       name: form.name.trim(),
+      shift: form.shift || null,
       sede: form.sede || null,
       business_unit: form.business_unit || null,
       position: form.position || null,
@@ -322,6 +332,7 @@ export default function SchedulesManagement() {
   // ── Horas extras (cálculo dinámico) ───────────────────────────────────────
   const overtimeRecords = useMemo(() => {
     return attendance
+      .filter((rec) => qualifiesForOT(rec.employee?.position))
       .map((rec) => {
         // Buscar asignación vigente en la fecha del registro
         const empId = rec.employee?.id
@@ -480,6 +491,7 @@ export default function SchedulesManagement() {
                 <thead>
                   <tr className="border-b border-gray-100 text-left">
                     <th className="px-4 py-3 font-semibold text-gray-600">Nombre</th>
+                    <th className="px-4 py-3 font-semibold text-gray-600 text-center">Turno</th>
                     <th className="px-4 py-3 font-semibold text-gray-600">Sede</th>
                     <th className="px-4 py-3 font-semibold text-gray-600">Unidad</th>
                     <th className="px-4 py-3 font-semibold text-gray-600">Cargo</th>
@@ -496,6 +508,17 @@ export default function SchedulesManagement() {
                   {filteredSchedules.map((s) => (
                     <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-800">{s.name}</td>
+                      <td className="px-4 py-3 text-center">
+                        {s.shift ? (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            s.shift === 'MAÑANA' ? 'bg-yellow-100 text-yellow-800'
+                            : s.shift === 'TARDE' ? 'bg-orange-100 text-orange-800'
+                            : 'bg-indigo-100 text-indigo-800'
+                          }`}>
+                            {s.shift === 'MAÑANA' ? '☀ Mañana' : s.shift === 'TARDE' ? '🌤 Tarde' : '🌙 Noche'}
+                          </span>
+                        ) : <span className="text-gray-300 italic text-xs">—</span>}
+                      </td>
                       <td className="px-4 py-3 text-gray-600">{s.sede || <span className="text-gray-300 italic">Todas</span>}</td>
                       <td className="px-4 py-3 text-gray-600">{s.business_unit || <span className="text-gray-300 italic">Todas</span>}</td>
                       <td className="px-4 py-3 text-gray-600">{s.position || <span className="text-gray-300 italic">Todos</span>}</td>
@@ -839,6 +862,21 @@ export default function SchedulesManagement() {
             </button>
           </div>
 
+          {/* Info: cargos con derecho a HE */}
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start gap-3">
+            <div className="w-7 h-7 bg-orange-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+              <TrendingUp size={14} className="text-orange-600" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-orange-800">Cargos con derecho a Horas Extras</p>
+              <p className="text-[10px] text-orange-700 mt-1">
+                Solo se calculan HE para:{' '}
+                <span className="font-bold">AUXILIAR DE ALMACÉN · MONTACARGUISTA · CONFERENTE · COMPAGINADOR</span>.
+                Los demás cargos no generan horas extras independientemente de la hora de salida.
+              </p>
+            </div>
+          </div>
+
           {/* Cards resumen */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -955,6 +993,30 @@ export default function SchedulesManagement() {
                 />
               </div>
 
+              {/* Turno */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Turno</label>
+                <div className="flex gap-2">
+                  {['', 'MAÑANA', 'TARDE', 'NOCHE'].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setForm({ ...form, shift: t })}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                        form.shift === t
+                          ? t === 'MAÑANA' ? 'bg-yellow-100 border-yellow-400 text-yellow-800'
+                          : t === 'TARDE'  ? 'bg-orange-100 border-orange-400 text-orange-800'
+                          : t === 'NOCHE'  ? 'bg-indigo-100 border-indigo-400 text-indigo-800'
+                          : 'bg-gray-100 border-gray-400 text-gray-700'
+                          : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                      }`}
+                    >
+                      {t === '' ? 'Sin turno' : t === 'MAÑANA' ? '☀ Mañana' : t === 'TARDE' ? '🌤 Tarde' : '🌙 Noche'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Sede y Unidad */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1044,45 +1106,34 @@ export default function SchedulesManagement() {
                 />
               </div>
 
-              {/* Bono puntualidad */}
-              <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
-                <div className="flex items-center justify-between mb-1">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-700">Bono de Puntualidad</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">
-                      Empleados que marcan entrada dentro del rango reciben <code className="bg-gray-100 px-1 rounded">has_bonus = true</code>
-                    </p>
+              {/* Bono puntualidad — solo OPL, automático */}
+              <div className="border border-yellow-200 rounded-xl p-4 bg-yellow-50/60">
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 bg-yellow-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-yellow-600 text-sm font-bold">★</span>
                   </div>
-                  <div
-                    onClick={() => setForm({ ...form, has_bonus: !form.has_bonus })}
-                    className={`w-10 h-5 rounded-full transition-colors cursor-pointer shrink-0 ${form.has_bonus ? 'bg-yellow-400' : 'bg-gray-300'}`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full mt-0.5 transition-transform shadow-sm ${form.has_bonus ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-yellow-800">Bono de Puntualidad — Automático</p>
+                    <p className="text-[10px] text-yellow-700 mt-1 leading-relaxed">
+                      Solo aplica a empleados con unidad de negocio <span className="font-bold">OPL</span>.
+                      El rango se calcula automáticamente: <span className="font-bold">10 min antes</span> de la hora de entrada hasta la hora de entrada.
+                    </p>
+                    {form.check_in_time && (() => {
+                      const [h, m] = form.check_in_time.split(':').map(Number)
+                      const endTotal = h * 60 + m
+                      const startTotal = endTotal - 10
+                      const sh = String(Math.floor(startTotal / 60)).padStart(2, '0')
+                      const sm = String(startTotal % 60).padStart(2, '0')
+                      const eh = String(Math.floor(endTotal / 60)).padStart(2, '0')
+                      const em = String(endTotal % 60).padStart(2, '0')
+                      return (
+                        <p className="mt-2 text-[11px] font-semibold text-yellow-800">
+                          Rango calculado: <span className="bg-yellow-200 px-1.5 py-0.5 rounded font-mono">{sh}:{sm} — {eh}:{em}</span>
+                        </p>
+                      )
+                    })()}
                   </div>
                 </div>
-
-                {form.has_bonus && (
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-gray-500 mb-1">Desde</label>
-                      <input
-                        type="time"
-                        value={form.bonus_start}
-                        onChange={(e) => setForm({ ...form, bonus_start: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-gray-500 mb-1">Hasta</label>
-                      <input
-                        type="time"
-                        value={form.bonus_end}
-                        onChange={(e) => setForm({ ...form, bonus_end: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Estado */}
