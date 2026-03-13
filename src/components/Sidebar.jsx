@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import pauserLogo from '../assets/Puaser_gestiongente.png'
 import { getOrganizationStructure } from '../services/organization'
 import {
   Users,
@@ -506,22 +507,23 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         <div className="flex flex-col min-h-full">
           {/* Header */}
           <div className={`
-            flex items-center h-20 px-6 mb-2 border-b border-gray-100
+            flex items-center h-24 px-3 mb-2 border-b border-gray-100
             ${isCollapsed && !isMobile ? 'justify-center' : 'justify-between'}
           `}>
             {(!isCollapsed || isMobile) && (
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
-                  <span className="text-white font-bold text-lg">P</span>
-                </div>
-                <span className="text-xl font-bold text-gray-800 tracking-tight">PAUSER</span>
-              </div>
+              <img
+                src={pauserLogo}
+                alt="Pauser Gestión de Gente"
+                className="h-16 w-auto max-w-[195px] object-contain"
+              />
             )}
-            
+
             {isCollapsed && !isMobile && (
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
-                <span className="text-white font-bold text-lg">P</span>
-              </div>
+              <img
+                src={pauserLogo}
+                alt="Pauser"
+                className="h-10 w-auto max-w-[48px] object-contain"
+              />
             )}
 
             <div className="flex items-center gap-2">

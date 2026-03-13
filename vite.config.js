@@ -9,4 +9,14 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/supabase-proxy': {
+        target: 'https://supabase.pauserdistribucionessac.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/supabase-proxy/, ''),
+        secure: true,
+      },
+    },
+  },
 })
