@@ -44,6 +44,7 @@ const EMPTY_SCHEDULE = {
   check_in_time: '07:00',
   check_out_time: '17:00',
   tolerance_minutes: 0,
+  has_bonus: true,
   bonus_start: '06:30',
   bonus_end: '06:50',
   is_active: true,
@@ -193,6 +194,7 @@ export default function SchedulesManagement() {
   const openEdit = (schedule) => {
     setModalMode('edit')
     setEditingSchedule(schedule)
+    const hasBonus = !!(schedule.bonus_start && schedule.bonus_end)
     setForm({
       name: schedule.name || '',
       sede: schedule.sede || '',
@@ -202,8 +204,9 @@ export default function SchedulesManagement() {
       check_in_time: formatTime(schedule.check_in_time),
       check_out_time: formatTime(schedule.check_out_time),
       tolerance_minutes: schedule.tolerance_minutes || 0,
-      bonus_start: formatTime(schedule.bonus_start) || '06:30',
-      bonus_end: formatTime(schedule.bonus_end) || '06:50',
+      has_bonus: hasBonus,
+      bonus_start: hasBonus ? formatTime(schedule.bonus_start) : '06:30',
+      bonus_end: hasBonus ? formatTime(schedule.bonus_end) : '06:50',
       is_active: schedule.is_active !== false,
     })
     setModalOpen(true)
@@ -216,16 +219,17 @@ export default function SchedulesManagement() {
 
     setSaving(true)
     const payload = {
-      ...form,
-      check_in_time: form.check_in_time + ':00',
-      check_out_time: form.check_out_time + ':00',
-      bonus_start: form.bonus_start ? form.bonus_start + ':00' : null,
-      bonus_end: form.bonus_end ? form.bonus_end + ':00' : null,
+      name: form.name.trim(),
       sede: form.sede || null,
       business_unit: form.business_unit || null,
       position: form.position || null,
       area: form.area || null,
+      check_in_time: form.check_in_time + ':00',
+      check_out_time: form.check_out_time + ':00',
       tolerance_minutes: parseInt(form.tolerance_minutes) || 0,
+      bonus_start: form.has_bonus && form.bonus_start ? form.bonus_start + ':00' : null,
+      bonus_end: form.has_bonus && form.bonus_end ? form.bonus_end + ':00' : null,
+      is_active: form.is_active,
     }
 
     let error
@@ -980,7 +984,8 @@ export default function SchedulesManagement() {
               {/* Cargo y Área */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Cargo (opcional)</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Cargo (opcional)</label>
+                  <p className="text-[10px] text-gray-400 mb-1.5">Solo como referencia — no asigna automáticamente</p>
                   <input
                     type="text"
                     placeholder="ej. CHOFER"
@@ -990,7 +995,8 @@ export default function SchedulesManagement() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Área (opcional)</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Área (opcional)</label>
+                  <p className="text-[10px] text-gray-400 mb-1.5">Solo como referencia — no asigna automáticamente</p>
                   <input
                     type="text"
                     placeholder="ej. OPERACIONES"
@@ -1038,27 +1044,45 @@ export default function SchedulesManagement() {
                 />
               </div>
 
-              {/* Rango bono */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Rango Bono Puntualidad (opcional)
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="time"
-                    value={form.bonus_start}
-                    onChange={(e) => setForm({ ...form, bonus_start: e.target.value })}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Inicio bono"
-                  />
-                  <input
-                    type="time"
-                    value={form.bonus_end}
-                    onChange={(e) => setForm({ ...form, bonus_end: e.target.value })}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Fin bono"
-                  />
+              {/* Bono puntualidad */}
+              <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">Bono de Puntualidad</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      Empleados que marcan entrada dentro del rango reciben <code className="bg-gray-100 px-1 rounded">has_bonus = true</code>
+                    </p>
+                  </div>
+                  <div
+                    onClick={() => setForm({ ...form, has_bonus: !form.has_bonus })}
+                    className={`w-10 h-5 rounded-full transition-colors cursor-pointer shrink-0 ${form.has_bonus ? 'bg-yellow-400' : 'bg-gray-300'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full mt-0.5 transition-transform shadow-sm ${form.has_bonus ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </div>
                 </div>
+
+                {form.has_bonus && (
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-gray-500 mb-1">Desde</label>
+                      <input
+                        type="time"
+                        value={form.bonus_start}
+                        onChange={(e) => setForm({ ...form, bonus_start: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-gray-500 mb-1">Hasta</label>
+                      <input
+                        type="time"
+                        value={form.bonus_end}
+                        onChange={(e) => setForm({ ...form, bonus_end: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Estado */}
