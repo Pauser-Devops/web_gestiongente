@@ -22,6 +22,7 @@ import DashboardLayout from './layouts/DashboardLayout'
 import EmployeeLifecycle from './pages/EmployeeLifecycle'
 import OrganizationStructure from './pages/OrganizationStructure'
 import HierarchyManagement from './pages/HierarchyManagement'
+import SchedulesManagement from './pages/SchedulesManagement'
 
 // Página 404
 const NotFound = () => (
@@ -206,6 +207,13 @@ function App() {
               <Route path="/reports" element={
                 <ProtectedRoute module="dashboard">
                   <ReportsCenter />
+                </ProtectedRoute>
+              } />
+
+              {/* Gestión de Horarios */}
+              <Route path="/schedules" element={
+                <ProtectedRoute module="schedules">
+                  <SchedulesManagement />
                 </ProtectedRoute>
               } />
             </Route>

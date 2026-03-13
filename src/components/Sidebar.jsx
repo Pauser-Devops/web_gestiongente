@@ -21,7 +21,8 @@ import {
   Clock,
   LayoutGrid,
   Smartphone,
-  RefreshCw
+  RefreshCw,
+  AlarmClock
 } from 'lucide-react'
 
 export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) {
@@ -174,12 +175,19 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       href: employeesHref, 
       module: 'employees' 
     }] : []),
-    { 
+    {
       id: 'attendance',
-      icon: Clock, 
-      label: 'Asistencias', 
-      href: '/attendance-list', 
-      module: 'attendance' 
+      icon: Clock,
+      label: 'Asistencias',
+      href: '/attendance-list',
+      module: 'attendance'
+    },
+    {
+      id: 'schedules',
+      icon: AlarmClock,
+      label: 'Horarios',
+      href: '/schedules',
+      module: 'schedules'
     },
     // Nuevo Módulo: Gestión de Altas y Bajas (Solo RRHH)
     {
