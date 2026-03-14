@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { getPendingValidations, validateAttendance } from '../services/attendance'
+import { supabase } from '../lib/supabase'
 import { CheckCircle, XCircle, Clock, MapPin, FileText, AlertCircle } from 'lucide-react'
 import Modal from '../components/ui/Modal'
 
@@ -84,6 +85,35 @@ export default function AttendanceValidation() {
             })
 
             showToast(approved ? 'Asistencia validada correctamente' : 'Asistencia rechazada', 'success')
+
+            // Notificar al empleado (best-effort)
+            try {
+                const attendanceRecord = attendances.find(a => a.attendance_id === attendanceId)
+                // employee_id puede venir del RPC o necesitar una consulta directa
+                let employeeId = attendanceRecord?.employee_id
+                if (!employeeId) {
+                    const { data: attRow } = await supabase
+                        .from('attendance')
+                        .select('employee_id')
+                        .eq('id', attendanceId)
+                        .single()
+                    employeeId = attRow?.employee_id
+                }
+                if (employeeId) {
+                    const workDate = attendanceRecord?.work_date
+                        ? new Date(attendanceRecord.work_date).toLocaleDateString('es-PE')
+                        : 'la fecha registrada'
+                    await supabase.from('notifications').insert({
+                        employee_id: employeeId,
+                        title: approved ? 'Tu asistencia fue validada' : 'Tu asistencia fue rechazada',
+                        message: approved
+                            ? `Tu registro de asistencia del ${workDate} fue validado por tu supervisor.`
+                            : `Tu registro de asistencia del ${workDate} fue rechazado. Motivo: ${notes || 'sin especificar'}.`,
+                        type: approved ? 'SUCCESS' : 'WARNING',
+                        metadata: { attendance_id: attendanceId, approved, notes },
+                    })
+                }
+            } catch (_) { /* no bloquear la acción principal */ }
             setModalConfig(prev => ({ ...prev, isOpen: false }))
             loadAttendances()
         } catch (error) {

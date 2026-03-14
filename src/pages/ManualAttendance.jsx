@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { getTeamAttendance, registerManualAttendance } from '../services/attendance'
+import { supabase } from '../lib/supabase'
 import { Calendar, Clock, User, FileText, Save } from 'lucide-react'
 
 export default function ManualAttendance() {
@@ -76,6 +77,18 @@ export default function ManualAttendance() {
                 recordType: formData.recordType,
                 notes: formData.notes || null
             })
+
+            // Notificar al empleado (best-effort)
+            try {
+                const workDateFormatted = new Date(formData.workDate + 'T00:00:00').toLocaleDateString('es-PE')
+                await supabase.from('notifications').insert({
+                    employee_id: formData.employeeId,
+                    title: 'Asistencia registrada manualmente',
+                    message: `Tu asistencia del ${workDateFormatted} fue registrada manualmente como ${formData.recordType}${formData.notes ? ': ' + formData.notes : ''}.`,
+                    type: 'INFO',
+                    metadata: { work_date: formData.workDate, record_type: formData.recordType },
+                })
+            } catch (_) { /* no bloquear la acción principal */ }
 
             alert('Registro manual creado correctamente')
             navigate('/')
