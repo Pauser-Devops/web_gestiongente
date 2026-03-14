@@ -69,18 +69,54 @@ export const getHistoricalAssignments = async (employeeIds = []) => {
 export const assignScheduleToEmployees = async (employeeIds, scheduleId, assignedById, notes = null) => {
   const today = new Date().toISOString().split('T')[0]
 
-  // Cerrar asignaciones abiertas de esos empleados
-  await supabase
+  // 1. Obtener el horario nuevo para saber sus work_days y tipo
+  const { data: newSchedule } = await supabase
+    .from('work_schedules')
+    .select('work_days, schedule_type, target_date')
+    .eq('id', scheduleId)
+    .single()
+
+  const newWorkDays = newSchedule?.work_days || [1, 2, 3, 4, 5, 6]
+  const isSpecial = newSchedule?.schedule_type !== 'REGULAR'
+  const targetDate = newSchedule?.target_date
+
+  // 2. Obtener asignaciones abiertas con sus work_days
+  const { data: current } = await supabase
     .from('employee_schedule_assignments')
-    .update({ valid_to: today })
+    .select('id, employee_id, schedule:schedule_id(work_days, schedule_type)')
     .in('employee_id', employeeIds)
     .is('valid_to', null)
 
-  // Crear nuevas asignaciones
+  // 3. Cerrar solo las asignaciones que solapan en días con el nuevo horario
+  //    - Si el nuevo es REGULAR: cerrar las que compartan algún día laborable
+  //    - Si el nuevo es FERIADO/DOMINGO: no cerrar regulares, solo especiales del mismo tipo
+  const toClose = (current || [])
+    .filter((a) => {
+      const existDays = a.schedule?.work_days || [1, 2, 3, 4, 5, 6]
+      const existType = a.schedule?.schedule_type || 'REGULAR'
+      if (isSpecial) return existType === newSchedule?.schedule_type  // solo cierra del mismo tipo especial
+      return existDays.some((d) => newWorkDays.includes(d))           // cierra si comparten días
+    })
+    .map((a) => a.id)
+
+  if (toClose.length > 0) {
+    await supabase
+      .from('employee_schedule_assignments')
+      .update({ valid_to: today })
+      .in('id', toClose)
+  }
+
+  // 4. Crear nuevas asignaciones
+  //    Especiales: válidas solo el día del evento (valid_from = valid_to = target_date)
+  //    Regulares:  válidas indefinidamente (valid_to = null)
+  const validFrom = isSpecial && targetDate ? targetDate : today
+  const validTo   = isSpecial && targetDate ? targetDate : null
+
   const assignments = employeeIds.map((empId) => ({
     employee_id: empId,
     schedule_id: scheduleId,
-    valid_from: today,
+    valid_from:  validFrom,
+    valid_to:    validTo,
     assigned_by: assignedById,
     notes,
   }))

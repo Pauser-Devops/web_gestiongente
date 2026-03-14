@@ -10,11 +10,12 @@ export default function DashboardLayout({ children }) {
 
   // Determinar si la vista requiere ancho completo
   // Se aplica específicamente para la vista de Monitor de Vacaciones (/vacaciones), Asistencias y Empleados
-  const isFullWidthPage = 
-    location.pathname === '/vacaciones' || 
-    location.pathname === '/attendance-list' || 
+  const isFullWidthPage =
+    location.pathname === '/vacaciones' ||
+    location.pathname === '/attendance-list' ||
     location.pathname.startsWith('/employees') ||
-    location.pathname === '/areas'
+    location.pathname === '/areas' ||
+    location.pathname === '/schedules'
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

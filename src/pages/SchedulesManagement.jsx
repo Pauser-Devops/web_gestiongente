@@ -32,6 +32,19 @@ const formatTime = (t) => {
   return t.substring(0, 5)
 }
 
+// Calcula el rango de bono automático: 10 min antes de check_in_time
+const calcBonusRange = (checkInTime) => {
+  if (!checkInTime) return null
+  const [h, m] = checkInTime.split(':').map(Number)
+  const totalMin = h * 60 + m
+  const start = totalMin - 10
+  const sh = String(Math.floor(start / 60)).padStart(2, '0')
+  const sm = String(start % 60).padStart(2, '0')
+  const eh = String(h).padStart(2, '0')
+  const em = String(m).padStart(2, '0')
+  return `${sh}:${sm} – ${eh}:${em}`
+}
+
 const toPeruTime = (isoStr) => {
   if (!isoStr) return '—'
   return new Date(isoStr).toLocaleTimeString('es-PE', {
@@ -45,6 +58,8 @@ const toPeruTime = (isoStr) => {
 const EMPTY_SCHEDULE = {
   name: '',
   shift: '',
+  schedule_type: 'REGULAR',
+  work_days: [1, 2, 3, 4, 5, 6],
   sede: '',
   business_unit: '',
   position: '',
@@ -206,6 +221,8 @@ export default function SchedulesManagement() {
     setForm({
       name: schedule.name || '',
       shift: schedule.shift || '',
+      schedule_type: schedule.schedule_type || 'REGULAR',
+      work_days: schedule.work_days || [1, 2, 3, 4, 5, 6],
       sede: schedule.sede || '',
       business_unit: schedule.business_unit || '',
       position: schedule.position || '',
@@ -230,6 +247,8 @@ export default function SchedulesManagement() {
     const payload = {
       name: form.name.trim(),
       shift: form.shift || null,
+      schedule_type: form.schedule_type || 'REGULAR',
+      work_days: form.work_days?.length ? form.work_days : [1, 2, 3, 4, 5, 6],
       sede: form.sede || null,
       business_unit: form.business_unit || null,
       position: form.position || null,
@@ -237,8 +256,8 @@ export default function SchedulesManagement() {
       check_in_time: form.check_in_time + ':00',
       check_out_time: form.check_out_time + ':00',
       tolerance_minutes: parseInt(form.tolerance_minutes) || 0,
-      bonus_start: form.has_bonus && form.bonus_start ? form.bonus_start + ':00' : null,
-      bonus_end: form.has_bonus && form.bonus_end ? form.bonus_end + ':00' : null,
+      bonus_start: null,
+      bonus_end: null,
       is_active: form.is_active,
     }
 
@@ -396,7 +415,7 @@ export default function SchedulesManagement() {
   ]
 
   return (
-    <div className="p-6 max-w-full">
+    <div className="p-4 max-w-full">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -500,6 +519,7 @@ export default function SchedulesManagement() {
                     <th className="px-4 py-3 font-semibold text-gray-600 text-center">Salida</th>
                     <th className="px-4 py-3 font-semibold text-gray-600 text-center">Tolerancia</th>
                     <th className="px-4 py-3 font-semibold text-gray-600 text-center">Bono</th>
+                    <th className="px-4 py-3 font-semibold text-gray-600 text-center">Tipo</th>
                     <th className="px-4 py-3 font-semibold text-gray-600 text-center">Estado</th>
                     {canWrite && <th className="px-4 py-3 font-semibold text-gray-600 text-right">Acciones</th>}
                   </tr>
@@ -538,10 +558,22 @@ export default function SchedulesManagement() {
                       <td className="px-4 py-3 text-center text-gray-600">
                         {s.tolerance_minutes ? `${s.tolerance_minutes} min` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-500">
-                        {s.bonus_start && s.bonus_end
-                          ? `${formatTime(s.bonus_start)} – ${formatTime(s.bonus_end)}`
-                          : '—'}
+                      <td className="px-4 py-3 text-center text-xs">
+                        {s.business_unit?.toUpperCase().includes('OPL')
+                          ? <span className="text-green-700 font-semibold">{calcBonusRange(s.check_in_time)}</span>
+                          : <span className="text-gray-300 italic">No aplica</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          !s.schedule_type || s.schedule_type === 'REGULAR' ? 'bg-blue-50 text-blue-700'
+                          : s.schedule_type === 'FERIADO' ? 'bg-red-100 text-red-700'
+                          : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {!s.schedule_type || s.schedule_type === 'REGULAR' ? 'Regular'
+                           : s.schedule_type === 'FERIADO'
+                             ? `📅 ${s.holiday_name || 'Feriado'}`
+                             : `🗓 ${s.holiday_name || 'Domingo'}`}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -1016,6 +1048,79 @@ export default function SchedulesManagement() {
                   ))}
                 </div>
               </div>
+
+              {/* Tipo de horario */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Tipo de Horario</label>
+                <div className="flex gap-2">
+                  {[
+                    { value: 'REGULAR', label: 'Regular', desc: 'Lun–Sáb', color: 'blue' },
+                    { value: 'FERIADO', label: 'Feriado', desc: 'Un día feriado', color: 'red' },
+                    { value: 'DOMINGO', label: 'Domingo', desc: 'Un domingo', color: 'purple' },
+                  ].map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, schedule_type: t.value,
+                        work_days: t.value === 'DOMINGO' ? [7] : t.value === 'FERIADO' ? [] : [1,2,3,4,5,6]
+                      })}
+                      className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold border transition-colors text-center ${
+                        form.schedule_type === t.value
+                          ? t.color === 'blue'   ? 'bg-blue-100 border-blue-400 text-blue-800'
+                          : t.color === 'red'    ? 'bg-red-100 border-red-400 text-red-800'
+                          : 'bg-purple-100 border-purple-400 text-purple-800'
+                          : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                      }`}
+                    >
+                      <div>{t.label}</div>
+                      <div className="text-[10px] font-normal opacity-70">{t.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                {form.schedule_type !== 'REGULAR' && (
+                  <div className={`mt-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${
+                    form.schedule_type === 'FERIADO' ? 'bg-red-50 text-red-700' : 'bg-purple-50 text-purple-700'
+                  }`}>
+                    <span className="font-bold">⚡</span>
+                    {form.schedule_type === 'FERIADO'
+                      ? 'Se asignará por un solo día feriado. Se actualiza automáticamente al siguiente feriado.'
+                      : 'Se asignará por un solo domingo. Se actualiza automáticamente al siguiente domingo.'}
+                  </div>
+                )}
+              </div>
+
+              {/* Días laborables (solo para REGULAR) */}
+              {form.schedule_type === 'REGULAR' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Días Laborables</label>
+                  <div className="flex gap-1.5">
+                    {[
+                      { v: 1, l: 'L' }, { v: 2, l: 'M' }, { v: 3, l: 'X' },
+                      { v: 4, l: 'J' }, { v: 5, l: 'V' }, { v: 6, l: 'S' }, { v: 7, l: 'D' }
+                    ].map((d) => {
+                      const active = (form.work_days || []).includes(d.v)
+                      return (
+                        <button
+                          key={d.v}
+                          type="button"
+                          onClick={() => {
+                            const days = form.work_days || []
+                            setForm({ ...form, work_days: active ? days.filter(x => x !== d.v) : [...days, d.v].sort() })
+                          }}
+                          className={`w-9 h-9 rounded-lg text-xs font-bold border transition-colors ${
+                            active
+                              ? d.v === 7 ? 'bg-orange-100 border-orange-400 text-orange-800'
+                                          : 'bg-blue-100 border-blue-400 text-blue-800'
+                              : 'bg-white border-gray-200 text-gray-400'
+                          }`}
+                        >
+                          {d.l}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Sede y Unidad */}
               <div className="grid grid-cols-2 gap-3">

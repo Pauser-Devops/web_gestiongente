@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -n \"CREATE TABLE public.roles\\\\|CREATE TABLE public.role_modules\" \"d:\\\\00_A_PAUSER\\\\pauser 2.0\\\\app_pauser_asistencias\"/*.sql)"
+      "Bash(grep -n \"CREATE TABLE public.roles\\\\|CREATE TABLE public.role_modules\" \"d:\\\\00_A_PAUSER\\\\pauser 2.0\\\\app_pauser_asistencias\"/*.sql)",
+      "Bash(\"d:/00_A_PAUSER/pauser 2.0/app_pauser_asistencias/SUPABASE_ADD_SHIFT_COLUMN.sql\":*)"
     ]
   }
 }
