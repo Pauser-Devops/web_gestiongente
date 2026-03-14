@@ -116,19 +116,22 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     let employeesLabel = 'Empleados'
     let showEmployeesMenu = true // Por defecto visible
     
-    // Si NO es Admin/SuperAdmin/JefeRRHH, redirigir a su sede
-    const isGlobalAdmin = user?.role === 'ADMIN' || 
-                          user?.role === 'SUPER ADMIN' || 
-                          user?.role === 'JEFE_RRHH' || 
-                          (user?.permissions && user?.permissions['*']) ||
-                          // Excepción Part Time ADM CENTRAL
-                          (user?.position?.includes('ANALISTA DE GENTE') && user?.position?.includes('PART TIME') && 
-                           user?.sede === 'ADM. CENTRAL' && 
-                           (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'))
-    // Nueva lógica: Determinar si es un JEFE que NO es JEFE DE GENTE DE GESTIÓN
     const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
     const userRole = normalize(user?.role);
     const userPosition = normalize(user?.position);
+
+    // Admin global: acceso sin restricciones a todo
+    const isGlobalAdmin = userRole === 'ADMIN' ||
+                          userRole === 'SUPER ADMIN' ||
+                          userRole === 'JEFE_RRHH' ||
+                          userRole === 'SISTEMAS' ||
+                          (user?.permissions && user?.permissions['*']) ||
+                          // JEFE DE GENTE Y GESTIÓN → siempre global
+                          userPosition.includes('JEFE DE GENTE') ||
+                          // ANALISTA DE GENTE Y GESTIÓN de ADM.CENTRAL/ADMINISTRACIÓN → global
+                          (userPosition.includes('ANALISTA DE GENTE') &&
+                           normalize(user?.sede || '').includes('ADM') && normalize(user?.sede || '').includes('CENTRAL') &&
+                           normalize(user?.business_unit || '').includes('ADMINISTRACI'))
     
     const isBoss = userRole.includes('JEFE') || 
                    userRole.includes('GERENTE') || 
@@ -146,7 +149,11 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     // JEFES y GERENTES deben tener acceso GLOBAL (ver todas las sedes) -> /employees
     // SUPERVISORES, COORDINADORES y ANALISTAS -> /my-team (Nueva vista simplificada)
     // Corrección: Supervisores y Coordinadores NO deben tener acceso global, deben ir a "Mi Equipo"
-    const hasGlobalTeamAccess = isGlobalAdmin || userRole.includes('JEFE') || userRole.includes('GERENTE') || userPosition.includes('JEFE') || userPosition.includes('GERENTE');
+    const hasGlobalTeamAccess = isGlobalAdmin ||
+                                userRole.includes('JEFE') || userRole.includes('GERENTE') ||
+                                userPosition.includes('JEFE') || userPosition.includes('GERENTE') ||
+                                // ANALISTA DE GENTE ve /employees (filtrado por su sede/unidad en EmployeesList)
+                                userPosition.includes('ANALISTA DE GENTE');
 
     if (!hasGlobalTeamAccess) {
         employeesLabel = 'Mi Equipo'
@@ -399,18 +406,32 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     const userRole = normalize(user?.role);
     const userPosition = normalize(user?.position);
 
-    // isAdmin: solo usuarios con permisos globales ('*'), i.e. admin@pauser.com
+    // isAdmin: SOLO admin@pauser.com (permisos '*') — único que ve Configuración
     const isAdmin = !!(user?.permissions?.['*'])
+
+    // isGlobalHR: JEFE DE GENTE (siempre) + ANALISTA DE GENTE de ADM.CENTRAL/ADMINISTRACIÓN
+    // Ven todos los módulos EXCEPTO Configuración (que es solo para admin@pauser.com)
+    const isGlobalHR = userPosition.includes('JEFE DE GENTE') ||
+                       (userPosition.includes('ANALISTA DE GENTE') &&
+                        normalize(user?.sede || '').includes('ADM') && normalize(user?.sede || '').includes('CENTRAL') &&
+                        normalize(user?.business_unit || '').includes('ADMINISTRACI'))
+
+    // isHRAnalyst: cualquier ANALISTA DE GENTE (incluyendo otras sedes)
+    const isHRAnalyst = userPosition.includes('ANALISTA DE GENTE')
 
     return menuItems.reduce((acc, item) => {
       // Verificar acceso al módulo por RBAC o permiso global
       const hasModuleAccess = isAdmin || !item.module ||
-                               !!(user?.permissions?.[item.module]?.read)
+                               !!(user?.permissions?.[item.module]?.read) ||
+                               // JEFE/ANALISTA DE GENTE global: todos los módulos EXCEPTO settings
+                               (isGlobalHR && item.module !== 'settings') ||
+                               // Cualquier ANALISTA DE GENTE: siempre ve employees y departments
+                               (isHRAnalyst && (item.module === 'employees' || item.module === 'departments'))
 
       if (!hasModuleAccess) return acc
 
       // Filtrado especial para departamentos
-      if (item.module === 'departments' && !isAdmin && user?.sede) {
+      if (item.module === 'departments' && !isAdmin && !isGlobalHR && user?.sede) {
           // --- OPTIMIZACIÓN DE NAVEGACIÓN POR SEDE Y ROL ---
           // Implementación de filtrado dinámico y permisos por ubicación
           

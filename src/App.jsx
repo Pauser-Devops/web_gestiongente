@@ -203,9 +203,9 @@ function App() {
                 </ProtectedRoute>
               } />
 
-              {/* Centro de Reportes - Accesible para roles con permisos de lectura o Admin */}
+              {/* Centro de Reportes - módulo propio para control granular */}
               <Route path="/reports" element={
-                <ProtectedRoute module="dashboard">
+                <ProtectedRoute module="reports">
                   <ReportsCenter />
                 </ProtectedRoute>
               } />

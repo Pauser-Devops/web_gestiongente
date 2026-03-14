@@ -41,26 +41,28 @@ export default function EmployeesList() {
   const [terminatingEmployee, setTerminatingEmployee] = useState(null)
 
   const sedeMap = {
-    'adm-central': 'ADM. CENTRAL', 'trujillo': 'TRUJILLO', 'chimbote': 'CHIMBOTE',
+    'adm-central': 'ADM.CENTRAL', 'trujillo': 'TRUJILLO', 'chimbote': 'CHIMBOTE',
     'huaraz': 'HUARAZ', 'huacho': 'HUACHO', 'chincha': 'CHINCHA',
     'ica': 'ICA', 'desaguadero': 'DESAGUADERO', 'lima': 'LIMA'
   }
 
-  let currentSedeName = sedeMap[sede] || sede
+  // Normalizar sede: eliminar espacio tras punto (sedes.name='ADM. CENTRAL' vs employees.sede='ADM.CENTRAL')
+  const normalizeSede = (name) => name ? name.replace(/\.\s+/g, '.').trim() : name
+  let currentSedeName = normalizeSede(sedeMap[sede] || sede)
   const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : ""
   const userRole = normalize(user?.role)
   const userPosition = normalize(user?.position)
 
   // ── Niveles de acceso ──────────────────────────────────────────────────────
   const isGlobalAdmin =
-    userRole === 'ADMIN' || userRole === 'SUPER ADMIN' || userRole === 'JEFE_RRHH' ||
-    userPosition.includes('JEFE DE GENTE') || 
+    userRole === 'ADMIN' || userRole === 'SUPER ADMIN' || userRole === 'JEFE_RRHH' || userRole === 'SISTEMAS' ||
+    userPosition.includes('JEFE DE GENTE') ||
     userPosition.includes('GERENTE GENERAL') ||
     (user?.permissions && user?.permissions['*']) ||
-    // Excepción específica: Analista Part Time de ADM. CENTRAL / ADMINISTRACIÓN
-    (userPosition.includes('ANALISTA DE GENTE') && userPosition.includes('PART TIME') && 
-     currentSedeName === 'ADM. CENTRAL' && 
-     (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'))
+    // ANALISTA DE GENTE Y GESTIÓN (con o sin PART TIME) de ADM. CENTRAL + ADMINISTRACIÓN
+    (userPosition.includes('ANALISTA DE GENTE') &&
+     normalize(user?.sede || '').includes('ADM') && normalize(user?.sede || '').includes('CENTRAL') &&
+     normalize(user?.business_unit || '').includes('ADMINISTRACI'))
 
   const isBoss =
     userRole.includes('JEFE') || userRole.includes('GERENTE') ||
@@ -114,13 +116,15 @@ export default function EmployeesList() {
     try {
       let query
 
+      // Incluir área del cargo directamente desde job_positions → areas
+      // Sin !hint para evitar ambigüedad en PostgREST (FK única en cada relación)
+      const selectFields = '*, job_positions(area_id, areas(name))'
+
       if (currentSedeName) {
-        query = supabase.from('employees').select('*').eq('sede', currentSedeName).eq('is_active', true)
+        query = supabase.from('employees').select(selectFields).eq('sede', currentSedeName).eq('is_active', true)
       } else {
-        // Admins y Jefes cargan TODOS los empleados activos
-        // El filtrado por área se aplica en cliente con filteredEmployees
         if (isGlobalAdmin || isBoss) {
-          query = supabase.from('employees').select('*').eq('is_active', true)
+          query = supabase.from('employees').select(selectFields).eq('is_active', true)
         } else {
           query = supabase.rpc('get_my_employees_v2').eq('is_active', true)
         }
@@ -132,9 +136,18 @@ export default function EmployeesList() {
       // Jefes y Admins NO están limitados por su propia unidad
       if (!isGlobalAdmin && !isBoss && user?.business_unit) {
         query = query.eq('business_unit', user.business_unit.toUpperCase())
-      } else if (businessUnit) {
-        query = query.eq('business_unit', businessUnit.toUpperCase())
+      } else if (businessUnit && !isGlobalAdmin) {
+        // Usuarios no-admin con URL businessUnit: filtrar en SQL
+        // Usar ilike con ambas formas (con y sin tilde) por si hay inconsistencia en la BD
+        const buNorm = normalize(businessUnit)
+        const buOrig = businessUnit.toUpperCase()
+        if (buOrig !== buNorm) {
+          query = query.or(`business_unit.ilike.${buOrig},business_unit.ilike.${buNorm}`)
+        } else {
+          query = query.ilike('business_unit', businessUnit)
+        }
       }
+      // Admins globales: sin filtro SQL por business_unit → se resuelve en cliente con normalize()
 
       const { data: positionsData } = await getPositions()
       const areaMap = {}
@@ -214,7 +227,7 @@ export default function EmployeesList() {
 
     const areas = [...new Set(employees
       .filter(e => (!selectedSede || e.sede === selectedSede) && (!selectedUnit || e.business_unit === selectedUnit))
-      .map(e => positionAreaMap[e.position] || 'Sin Área').filter(Boolean))].sort()
+      .map(e => e.job_positions?.areas?.name || positionAreaMap[e.position] || 'Sin Área').filter(Boolean))].sort()
     return { sedes, units, areas }
   }, [employees, structureData, selectedSede, selectedUnit, positionAreaMap])
 
@@ -223,21 +236,27 @@ export default function EmployeesList() {
       if (filterOptions.sedes.length === 1 && !selectedSede) setSelectedSede(filterOptions.sedes[0])
       if (filterOptions.units.length === 1 && !selectedUnit) setSelectedUnit(filterOptions.units[0])
       if (filterOptions.areas.length === 1 && !selectedArea) setSelectedArea(filterOptions.areas[0])
+      // Auto-seleccionar unidad del URL param para admins globales (resuelve diferencias de tilde)
+      if (isGlobalAdmin && businessUnit && !selectedUnit) {
+        const match = employees.find(e => normalize(e.business_unit) === normalize(businessUnit))
+        if (match) setSelectedUnit(match.business_unit)
+      }
       // Auto-seleccionar el área restringida del jefe (sin tocar sede ni unidad)
       if (isBoss && !isGlobalAdmin && userRestrictedArea && !selectedArea) {
         const match = filterOptions.areas.find(a => normalize(a) === normalize(userRestrictedArea))
         if (match) setSelectedArea(match)
       }
     }
-  }, [loading, employees, filterOptions, isBoss, isGlobalAdmin, userRestrictedArea])
+  }, [loading, employees, filterOptions, isBoss, isGlobalAdmin, userRestrictedArea, businessUnit])
 
   // ── Filtrado en cliente ────────────────────────────────────────────────────
+  // Obtener área de un empleado: primero por job_position (exacto), luego por positionAreaMap (texto)
+  const getEmpArea = (emp) =>
+    emp.job_positions?.areas?.name || positionAreaMap[emp.position] || 'Sin Área'
+
   const totalInScope = useMemo(() => {
     if (!userRestrictedArea) return employees.length
-    return employees.filter(emp => {
-      const empArea = positionAreaMap[emp.position] || 'Sin Área'
-      return normalize(empArea) === normalize(userRestrictedArea)
-    }).length
+    return employees.filter(emp => normalize(getEmpArea(emp)) === normalize(userRestrictedArea)).length
   }, [employees, userRestrictedArea, positionAreaMap])
 
   const filteredEmployees = employees.filter(emp => {
@@ -246,8 +265,7 @@ export default function EmployeesList() {
       emp.dni?.includes(searchTerm)
     const matchesSede = !selectedSede || emp.sede === selectedSede
     const matchesUnit = !selectedUnit || emp.business_unit === selectedUnit
-    const empArea = positionAreaMap[emp.position] || 'Sin Área'
-    // Jefes con área restringida siempre filtran por su área, sin importar el selector
+    const empArea = getEmpArea(emp)
     const matchesArea = userRestrictedArea
       ? normalize(empArea) === normalize(userRestrictedArea)
       : (!selectedArea || empArea === selectedArea)
@@ -260,7 +278,7 @@ export default function EmployeesList() {
   })
 
   const isHR = userRole === 'JEFE_RRHH' || userRole === 'ADMIN' || userRole === 'SUPER ADMIN' || userPosition.includes('JEFE DE GENTE')
-  const isCentralHRAnalyst = userPosition.includes('ANALISTA DE GENTE') && user?.sede === 'ADM. CENTRAL' &&
+  const isCentralHRAnalyst = userPosition.includes('ANALISTA DE GENTE') && user?.sede === 'ADM.CENTRAL' &&
     (user?.business_unit === 'ADMINISTRACIÓN' || user?.business_unit === 'ADMINISTRACION')
   const canManage = isHR || isCentralHRAnalyst
   const activeFiltersCount = [selectedSede, selectedUnit, selectedArea, selectedType].filter(Boolean).length
@@ -282,7 +300,7 @@ export default function EmployeesList() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-200">
-              {currentSedeName === 'ADM. CENTRAL' ? <Building2 size={20} className="text-white" /> : <Users size={20} className="text-white" />}
+              {currentSedeName === 'ADM.CENTRAL' ? <Building2 size={20} className="text-white" /> : <Users size={20} className="text-white" />}
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900 leading-tight">

@@ -69,7 +69,7 @@ export default function EmployeeLifecycle() {
         (user?.permissions && user?.permissions['*']) ||
         // Excepción Part Time ADM CENTRAL
         (userPosition.includes('ANALISTA DE GENTE') && userPosition.includes('PART TIME') && 
-         user?.sede === 'ADM. CENTRAL' && 
+         user?.sede === 'ADM.CENTRAL' &&
          (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'));
       
       const isBoss = userRole.includes('JEFE') || 

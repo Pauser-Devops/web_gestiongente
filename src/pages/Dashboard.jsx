@@ -39,18 +39,17 @@ export default function Dashboard() {
       userRole === 'ADMIN' ||
       userRole === 'SUPER ADMIN' ||
       userRole === 'JEFE_RRHH' ||
-      userPosition.includes('JEFE DE GENTE') || 
-      userPosition.includes('GERENTE') ||
+      userPosition.includes('JEFE DE GENTE') ||
       userPosition.includes('GERENTE GENERAL') ||
       (user?.permissions && user?.permissions['*']) ||
-      // Excepción Part Time ADM CENTRAL
-      (userPosition.includes('ANALISTA DE GENTE') && userPosition.includes('PART TIME') && 
-       user?.sede === 'ADM. CENTRAL' && 
-       (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'))
-    
-    const isBoss = userRole.includes('JEFE') || 
-                   userRole.includes('GERENTE') || 
-                   userPosition.includes('JEFE') || 
+      // ANALISTA DE GENTE Y GESTIÓN (con o sin PART TIME) de ADM. CENTRAL + ADMINISTRACIÓN
+      (userPosition.includes('ANALISTA DE GENTE') &&
+       normalize(user?.sede || '').includes('ADM') && normalize(user?.sede || '').includes('CENTRAL') &&
+       normalize(user?.business_unit || '').includes('ADMINISTRACI'))
+
+    const isBoss = userRole.includes('JEFE') ||
+                   userRole.includes('GERENTE') ||
+                   userPosition.includes('JEFE') ||
                    userPosition.includes('GERENTE') ||
                    userPosition.includes('COORDINADOR') ||
                    userPosition.includes('SUPERVISOR');
@@ -60,11 +59,12 @@ export default function Dashboard() {
 
     let querySede = null
     let queryBusinessUnit = null
-    
+
     if (!isGlobalAdmin) {
-        // Aplicar filtros si es empleado normal O si es un Jefe Local (Supervisor/Coord)
-        if (user?.sede && (!isBoss || isLocalBoss)) querySede = user.sede
-        if (user?.business_unit && (!isBoss || isLocalBoss)) queryBusinessUnit = user.business_unit
+        // JEFE/GERENTE de área: sin restricción de sede (ven toda su área en todas las sedes)
+        // SUPERVISOR/COORDINADOR/otros: restringidos a su sede y unidad
+        if (user?.sede && !isBoss) querySede = user.sede
+        if (user?.business_unit && !isBoss) queryBusinessUnit = user.business_unit
     }
 
     // 1. Cargar datos iniciales

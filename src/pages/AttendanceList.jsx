@@ -239,7 +239,10 @@ export default function AttendanceList() {
                 userRole === 'JEFE_RRHH' ||
                 userPosition.includes('JEFE DE GENTE') ||
                 userPosition.includes('GERENTE GENERAL') ||
-                userPosition.includes('ANALISTA DE GENTE') || // Analistas de Gente y Gestión tienen acceso global
+                // ANALISTA DE GENTE: solo admin global si es de ADM. CENTRAL + ADMINISTRACIÓN
+                (userPosition.includes('ANALISTA DE GENTE') &&
+                    normalize(user?.sede || '').includes('ADM') && normalize(user?.sede || '').includes('CENTRAL') &&
+                    normalize(user?.business_unit || '').includes('ADMINISTRACI')) ||
                 (user?.permissions && user?.permissions['*'])
             );
             
@@ -250,9 +253,14 @@ export default function AttendanceList() {
                            userPosition.includes('COORDINADOR') ||
                            userPosition.includes('SUPERVISOR');
 
-            // --- NUEVO: Obtener empleados permitidos por Área (Seguridad estricta) ---
+            // ANALISTA DE GENTE Y GESTIÓN: filtra por sede + unidad de negocio (no por área)
+            const isAnalistaGente = userPosition.includes('ANALISTA DE GENTE');
+
+            // Para web: JEFE/SUPERVISOR/COORDINADOR confían en el SQL (auth.email() activo).
+            // El SQL get_daily_attendance_report ya aplica seguridad por area_id+sede para estos roles.
+            // allowedIds solo se usa para roles que no son boss, no son admin y no son analista de gente.
             let allowedIds = null;
-            if (!isGlobalAdmin) {
+            if (!isGlobalAdmin && !isAnalistaGente && !isBoss) {
                  const { data: allowedEmployees } = await supabase.rpc('get_employees_by_user_area')
                  if (allowedEmployees) {
                      allowedIds = new Set(allowedEmployees.map(e => e.id))
@@ -260,13 +268,12 @@ export default function AttendanceList() {
                      allowedIds = new Set() // Sin acceso
                  }
             }
-            
-            // CORRECCIÓN FILTRO SUPERVISOR:
-            // Si el usuario es Supervisor (isBoss), el código anterior NO filtraba por sede/unidad.
-            // PERO si es Jefe de Área, debe poder ver su área en CUALQUIER sede.
-            // Por tanto, solo forzamos Sede si NO es Boss. Si es Boss, confiamos en el filtro de Área (allowedIds).
-            const shouldFilterBySede = !isGlobalAdmin && !isBoss && user?.sede;
-            const shouldFilterByUnit = !isGlobalAdmin && !isBoss && user?.business_unit;
+
+            // Forzar sede/unidad en el RPC para roles que no son boss ni admin
+            // Boss (JEFE/SUPERVISOR/COORDINADOR): pasa sede+unidad null → SQL maneja seguridad
+            // ANALISTA DE GENTE no-admin: fuerza su sede y unidad
+            const shouldFilterBySede = !isGlobalAdmin && (!isBoss || isAnalistaGente) && user?.sede;
+            const shouldFilterByUnit = !isGlobalAdmin && (!isBoss || isAnalistaGente) && user?.business_unit;
 
             // Detectar si estamos viendo un solo día (modo reporte diario / Roster)
             // IMPORTANTE: Solo usar modo Roster si el filtro de estado es general
@@ -385,24 +392,23 @@ export default function AttendanceList() {
                 setTotalPages(Math.ceil(totalRows / PAGE_SIZE))
                 
                 // Obtener estadísticas globales para el día seleccionado
-                if (page === 1) { 
-                    // CORRECCIÓN: Si tenemos filtrado por Área (allowedIds) o filtros locales,
-                    // calculamos las stats en memoria basándonos en processedList (que ya está filtrada)
-                    // para asegurar que los números coincidan con la tabla.
-                    if (allowedIds && allowedIds.size > 0) {
-                         const total = fullListForStats.length
-                         const onTime = fullListForStats.filter(i => i.record_type === 'ASISTENCIA' && !i.is_late).length
-                         const late = fullListForStats.filter(i => i.record_type === 'ASISTENCIA' && i.is_late).length
-                         const absent = fullListForStats.filter(i => {
-                             const isAbsenceType = ['AUSENCIA', 'INASISTENCIA', 'FALTA JUSTIFICADA', 'AUSENCIA SIN JUSTIFICAR', 'FALTA_INJUSTIFICADA'].includes(i.record_type)
-                             const isImplicitAbsence = !i.check_in && !['DESCANSO MÉDICO', 'LICENCIA CON GOCE', 'VACACIONES', 'ASISTENCIA'].includes(i.record_type)
-                             const isComputedAbsent = i.status === 'absent'
-                             return isAbsenceType || isImplicitAbsence || isComputedAbsent
-                         }).length
-
-                         setGlobalStats({ total, onTime, late, absent })
+                if (page === 1) {
+                    // Siempre calcular stats desde la lista completa ya filtrada por seguridad.
+                    // El RPC anterior devolvía totales globales (490) cuando rpcSede/Unit eran null,
+                    // lo que causaba inconsistencia con la tabla (321 para JEFE DE ÁREA, etc.)
+                    if (!isGlobalAdmin || (allowedIds && allowedIds.size > 0)) {
+                        const total = fullListForStats.length
+                        const onTime = fullListForStats.filter(i => i.record_type === 'ASISTENCIA' && !i.is_late).length
+                        const late = fullListForStats.filter(i => i.record_type === 'ASISTENCIA' && i.is_late).length
+                        const absent = fullListForStats.filter(i => {
+                            const isAbsenceType = ['AUSENCIA', 'INASISTENCIA', 'FALTA JUSTIFICADA', 'AUSENCIA SIN JUSTIFICAR', 'FALTA_INJUSTIFICADA'].includes(i.record_type)
+                            const isImplicitAbsence = !i.check_in && !['DESCANSO MÉDICO', 'LICENCIA CON GOCE', 'VACACIONES', 'ASISTENCIA'].includes(i.record_type)
+                            const isComputedAbsent = i.status === 'absent'
+                            return isAbsenceType || isImplicitAbsence || isComputedAbsent
+                        }).length
+                        setGlobalStats({ total, onTime, late, absent })
                     } else {
-                        // Si no hay restricciones de área, usamos el RPC para eficiencia
+                        // Solo para admin global sin filtros: RPC es más eficiente
                         try {
                             const { data: statsData, error: statsError } = await supabase.rpc('get_daily_attendance_stats', {
                                 p_date: filters.dateFrom,
@@ -410,10 +416,7 @@ export default function AttendanceList() {
                                 p_business_unit: rpcBusinessUnit,
                                 p_search: filters.search || null
                             })
-
-                            if (statsError) console.error('Error fetching daily stats:', statsError)
-                            
-                            if (statsData) {
+                            if (!statsError && statsData) {
                                 setGlobalStats({
                                     total: statsData.total,
                                     onTime: statsData.onTime,

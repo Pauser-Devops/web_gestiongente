@@ -82,27 +82,28 @@ export default function ReportsCenter() {
     const userPosition = normalize(user?.position);
     const userRole = normalize(user?.role);
 
-    const isGlobalAdmin = 
-        user?.role === 'ADMIN' || 
-        user?.role === 'SUPER ADMIN' || 
-        user?.role === 'JEFE_RRHH' || 
+    const isGlobalAdmin =
+        user?.role === 'ADMIN' ||
+        user?.role === 'SUPER ADMIN' ||
+        user?.role === 'JEFE_RRHH' ||
         (user?.permissions && user?.permissions['*']) ||
-        // Excepción Part Time ADM CENTRAL
-        (userPosition.includes('ANALISTA DE GENTE') && userPosition.includes('PART TIME') && 
-         user?.sede === 'ADM. CENTRAL' && 
-         (user?.business_unit?.toUpperCase() === 'ADMINISTRACIÓN' || user?.business_unit?.toUpperCase() === 'ADMINISTRACION'));
-
-    const canSelectSede = isGlobalAdmin && !user?.sede
-
-    const canViewFilters = isGlobalAdmin || userRole.includes('JEFE DE GENTE Y GESTION') || userRole === 'GERENTE';
+        // ANALISTA DE GENTE Y GESTIÓN (con o sin PART TIME) de ADM. CENTRAL + ADMINISTRACIÓN → ve todo
+        (userPosition.includes('ANALISTA DE GENTE') &&
+         normalize(user?.sede || '').includes('ADM') && normalize(user?.sede || '').includes('CENTRAL') &&
+         normalize(user?.business_unit || '').includes('ADMINISTRACI'));
 
     // ── SOBREESCRIBIR PERMISOS PARA JEFE DE GENTE Y GESTIÓN ──
-    // Si es Jefe de Gente y Gestión, puede filtrar todo sin restricciones (como un admin para reportes)
     const isJefeGyG = userRole.includes('JEFE DE GENTE Y GESTION') || userPosition.includes('JEFE DE GENTE Y GESTION');
-    
-    // Si es Jefe GyG, anulamos la restricción de sede y unidad de negocio que viene del user profile
-    const effectiveSede = isJefeGyG ? (selectedSede === 'all' ? null : selectedSede) : (user?.sede || selectedSede === 'all' ? null : selectedSede);
-    const effectiveBusinessUnit = isJefeGyG ? (selectedBusinessUnit === 'all' ? null : selectedBusinessUnit) : (user?.business_unit || selectedBusinessUnit === 'all' ? null : selectedBusinessUnit);
+
+    const canSelectSede = isGlobalAdmin && !user?.sede
+    const canViewFilters = isGlobalAdmin || isJefeGyG || userRole === 'GERENTE';
+
+    // Sede a usar en llamadas a la API:
+    // - Admin / JefeGyG: respeta el selector (puede ser null para ver todo)
+    // - Otros: fuerza la sede del usuario (nunca null si tiene sede)
+    const apiSede = (isGlobalAdmin || isJefeGyG)
+        ? (selectedSede === 'all' ? null : selectedSede)
+        : (user?.sede || null);
 
     // Permitir selección de sede si es Admin O Jefe GyG
     const canSelectSedeFinal = canSelectSede || isJefeGyG;
@@ -167,7 +168,7 @@ export default function ReportsCenter() {
                     // TRAEMOS TODO DE LA SEDE (businessUnit = null) Y FILTRAMOS EN MEMORIA
                     // Esto corrige el problema de que el backend sea muy estricto o case-sensitive
                     const { data: empData, error: empError } = await getEmployeesReport(
-                        isJefeGyG ? (selectedSede === 'all' ? null : selectedSede) : (selectedSede === 'all' ? null : selectedSede), 
+                        apiSede,
                         null // selectedBusinessUnit -> NULL para traer todo y filtrar localmente
                     )
                     
@@ -221,7 +222,7 @@ export default function ReportsCenter() {
                     const { data: rawAttData, error: attError } = await getAttendanceReport(
                         queryStartStr,
                         queryEndStr,
-                        selectedSede === 'all' ? null : selectedSede
+                        apiSede
                     )
 
                     if (attError || !rawAttData) {
@@ -236,7 +237,7 @@ export default function ReportsCenter() {
                     // 2. Obtener lista de empleados para el cruce (Roster)
                     // TRAEMOS TODO DE LA SEDE (businessUnit = null) Y FILTRAMOS EN MEMORIA
                     const { data: allEmployees, error: empError2 } = await getEmployeesReport(
-                        selectedSede === 'all' ? null : selectedSede, 
+                        apiSede,
                         null
                     )
 
@@ -367,7 +368,7 @@ export default function ReportsCenter() {
                     const { data: termData, error: termError } = await getTerminationsReport(
                         tStart,
                         tEnd,
-                        selectedSede === 'all' ? null : selectedSede,
+                        apiSede,
                         null // selectedBusinessUnit -> NULL
                     )
                     
@@ -401,7 +402,7 @@ export default function ReportsCenter() {
                     const { data: hiresData } = await getNewHiresReport(
                         selectedMonth.year,
                         selectedMonth.month,
-                        selectedSede === 'all' ? null : selectedSede
+                        apiSede
                     )
 
                     // Filtrar por BU y Área en memoria usando helper robusto
@@ -422,7 +423,7 @@ export default function ReportsCenter() {
 
                 case 'vacations':
                     const { data: vacData } = await getVacationBalanceReport(
-                        selectedSede === 'all' ? null : selectedSede
+                        apiSede
                     )
                     
                     // Filtrar por BU y Área en memoria usando helper robusto
@@ -526,7 +527,7 @@ export default function ReportsCenter() {
                             className={`border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 min-w-[140px] ${!canSelectSedeFinal ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
                         >
                             <option value="all">Todas las Sedes</option>
-                            <option value="ADM. CENTRAL">ADM. CENTRAL</option>
+                            <option value="ADM.CENTRAL">ADM.CENTRAL</option>
                             <option value="LIMA">Lima</option>
                             <option value="TRUJILLO">Trujillo</option>
                             <option value="CHIMBOTE">Chimbote</option>
